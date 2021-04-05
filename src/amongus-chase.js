@@ -7,6 +7,7 @@ var corridorB = 2;
 var PLAYER_SIZE = 48;
 var TEXT_COLOR = "black";
 var KILL_DISTANCE = 30;
+var TASKS
 var players = {};
 var players_length;
 var mySessionId;
@@ -22,8 +23,20 @@ var g_obstacles;
 var style, styleImpostor;
 var g_game;
 var g_my_tasks = [];
+var TASKS = [
+  {x: 1633, y: 273, name: "Wires"},
+  {x: 2332, y: 300, name: "Download"},
+  {x: 811, y: 1061, name: "Wires"},
+  {x: 2413, y: 381, name: "Garbage"},
+  {x: 1585, y: 1293, name: "Distributor"},
+  {x: 1335, y: 1276, name: "Power"},
+  {x: 2914, y: 1501, name: "Accept Power"},
+  {x: 3566, y: 1049, name: "Steering"},
+  {x: 2524, y: 931, name: "O2 filter"}
+]
 
 var nick = getCookie("nick") || "";
+
 if (nick) {
     var nickInput = Q("#name");
     nickInput.value = nick;
@@ -126,7 +139,7 @@ function setup() {
                 container.addChild(tree);
                 obstacle.sprite = tree;
 			})
-			
+
 		});
         room.state.players.onAdd = addPlayer;
         room.state.players.onRemove = removePlayer;
@@ -156,7 +169,7 @@ function setup() {
                 fontSize: PLAYER_SIZE/2,
                 fill: "red"
             });
-				
+
 			}
             for (var i = 0; i < changes.length; i++) {
                 console.log("stateChangeHandler:", changes[i].field);
@@ -329,10 +342,10 @@ function setup() {
 								if(p.alive)
 									room.send('killed', p.id)
 							} else {
-								show(Q("#killPlayer"));	
+								show(Q("#killPlayer"));
 							}
 						} else {
-							hide(Q("#killPlayer"));	
+							hide(Q("#killPlayer"));
 						}
 					}
                     p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 0.3);
@@ -344,7 +357,7 @@ function setup() {
             if (!me.alive) {
                 return;
             }
-			
+
 			var futureMePos = {x: me.x, y: me.y, getBounds: getBoundsPlayer};
 			if (state.game == "chase") {
 				futureMePos.x += me.s.x*2;
@@ -418,13 +431,13 @@ function setup() {
                 //info.innerHTML = "me.s: " + me.s.length();
             }
         }
-		
+
 		function checkActions(p) {
 			g_my_tasks.forEach((task) => {
-					
+
 			});
 		}
-		
+
         const rate = 4;
         var curr_vec = new Victor(0, 0);
         function getSpeed() {
@@ -508,11 +521,11 @@ function colisionTest(object1, object2) {
     var bounds1 = object1.getBounds();
     var bounds2 = object2.getBounds();
     var flagx = 1, flagy = 1;
-    if (bounds1.x >= bounds2.x + bounds2.width || bounds2.x >= bounds1.x + bounds1.width) 
+    if (bounds1.x >= bounds2.x + bounds2.width || bounds2.x >= bounds1.x + bounds1.width)
         return false;
     if (bounds1.y >= bounds2.y + bounds2.height || bounds2.y>= bounds1.y+ bounds1.height)
         return false;
-            
+
     return {x: Math.abs(object1.x - object2.x), y: Math.abs(object1.y - object2.y)};
 }
 

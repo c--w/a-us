@@ -3,6 +3,7 @@ const schema = require('@colyseus/schema');
 Player = class Player extends schema.Schema {
     constructor() {
         super();
+        this.completed = 0;
     }
 }
 schema.defineTypes(Player, {
@@ -12,7 +13,9 @@ schema.defineTypes(Player, {
     alive: "boolean",
     name: "string",
     id: "string",
-    color: "string"
+    color: "string",
+    tasks: "string",
+    completed: "uint8"
 });
 
 // Our custom game state, an ArraySchema of type Player only at the moment
@@ -23,6 +26,7 @@ State = class State extends schema.Schema {
         this.started = false;
         this.elapsed = 0;
 		this.game = game;
+        this.impostor_left = false;
     }
 }
 schema.defineTypes(State, {
@@ -31,7 +35,8 @@ schema.defineTypes(State, {
     world_size_y: "number",
     started: "boolean",
     elapsed: "uint8",
-	game: "string"
+	game: "string",
+    impostor_left: "boolean"
 });
 
 exports.State = State;
