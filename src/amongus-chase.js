@@ -6,6 +6,7 @@ var corridorG = 2;
 var corridorB = 2;
 var PLAYER_SIZE = 48;
 var TEXT_COLOR = "black";
+var KILL_DISTANCE = 30;
 var players = {};
 var players_length;
 var mySessionId;
@@ -14,12 +15,13 @@ var offset;
 var state;
 var tilingSprite;
 var container;
-var myRoom;
+var g_room;
 var graphics;
 var g_map;
 var g_obstacles;
 var style, styleImpostor;
 var g_game;
+var g_my_tasks = [];
 
 var nick = getCookie("nick") || "";
 if (nick) {
@@ -44,8 +46,7 @@ function isTouchDevice() {
 }
 
 if (isTouchDevice()) {
-    var joyDiv = Q("#joyDiv");
-    joyDiv.style.display = 'block';
+	show(Q("#joyDiv"))
     var joy = new JoyStick('joyDiv');
 } else {
     window.addEventListener('mousemove', e => {
@@ -95,7 +96,7 @@ function setup() {
     var client = new Colyseus.Client(location.protocol.replace("http", "ws") + "//" + host + (location.port ? ':' + location.port : ''));
     client.joinOrCreate("amongus-chase").then(room => {
         console.log("joined with ", room.sessionId);
-        myRoom = room;
+        g_room = room;
         state = room.state;
         mySessionId = room.sessionId;
         room.onStateChange.once(function (state) {
@@ -138,6 +139,7 @@ function setup() {
                 NON_SCROLLING_RATIO = 0.3;
                 PLAYER_SIZE = 48;
                 TEXT_COLOR = "white";
+				KILL_DISTANCE = 60;
             } else {
                 INPUT_RESPONSE_RATE = 0.01;
                 NON_SCROLLING_RATIO = 0.1;
@@ -161,16 +163,14 @@ function setup() {
                 if (changes[i].field == "started") {
                     if (changes[i].value == true) {
                         console.log("GAME STARTED");
-                        var message = Q("#message");
-                        message.style.display = "none";
+                        hide(Q("#message"));
                     } else {
-                        var startDiv = Q("#startGame");
-                        startDiv.style.display = 'block';
+                        show(Q("#startGame"));
                         if (!me)
                             return;
                         console.log("GAME FINISHED");
                         var message = Q("#message");
-                        message.style.display = "block";
+                        show(message);
                         if (state.elapsed >= 100) {
                             message.innerHTML = "IMPOSTOR FAILED";
                             console.log("IMPOSTOR FAILED");
@@ -179,8 +179,7 @@ function setup() {
                             console.log("IMPOSTOR WON");
                         }
                         setTimeout(() => {
-                            var message = Q("#message");
-                            message.style.display = "none";
+                            hide(Q("#message"));
                         }, 5000);
                     }
                 } else if (changes[i].field == "elapsed") {
@@ -324,16 +323,20 @@ function setup() {
             for (const id in players) {
                 if (id != mySessionId) {
                     var p = players[id];
-                    //var new_sprite_x = p.x - offset.x + tilingSprite.tilePosition.x;
-                    //var new_sprite_y = p.y - offset.y + tilingSprite.tilePosition.y;
+					if (me.impostor) {
+						if(canKill(p)) {
+							if(g_game == "chase") {
+								if(p.alive)
+									room.send('killed', p.id)
+							} else {
+								show(Q("#killPlayer"));	
+							}
+						} else {
+							hide(Q("#killPlayer"));	
+						}
+					}
                     p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 0.3);
                     p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.y, 0.3);
-                    //var diffx = new_sprite_x - p.sprite.x;
-                    //var diffy = new_sprite_y - p.sprite.y;
-                    //p.sprite.x = lerp(new_sprite_x, p.sprite.x+diffx*2, 0.2);
-                    //p.sprite.y = lerp(new_sprite_y, p.sprite.y+diffy*2, 0.2);
-                    //p.sprite.x = new_sprite_x;
-                    //p.sprite.y = new_sprite_y;
                     p.tag.x = p.sprite.x;
                     p.tag.y = p.sprite.y - p.sprite.height;
                 }
@@ -344,8 +347,8 @@ function setup() {
 			
 			var futureMePos = {x: me.x, y: me.y, getBounds: getBoundsPlayer};
 			if (state.game == "chase") {
-				futureMePos.x += me.s.x;
-				futureMePos.y += me.s.y;
+				futureMePos.x += me.s.x*2;
+				futureMePos.y += me.s.y*2;
 			    if (g_obstacles && g_obstacles.length) {
 			        g_obstacles.forEach((obstacle) => {
 			            var collision = colisionTest(futureMePos, obstacle);
@@ -358,6 +361,7 @@ function setup() {
 			        })
 			    }
 			} else {
+				checkActions();
 				futureMePos.x += me.s.x*2;
 				if(!isCorridor(futureMePos.x, futureMePos.y))
 					me.s.x*= 0;
@@ -414,6 +418,13 @@ function setup() {
                 //info.innerHTML = "me.s: " + me.s.length();
             }
         }
+		
+		function checkActions(p) {
+			g_my_tasks.forEach((task) => {
+					
+			});
+		}
+		
         const rate = 4;
         var curr_vec = new Victor(0, 0);
         function getSpeed() {
@@ -442,16 +453,33 @@ function setup() {
             room.send("color", select.value);
             setCookie("color", select.value);
 
-            var form = Q("#form");
-            form.style.display = 'none';
-            var startDiv = Q("#startGame");
-			startDiv.style.display = 'block';
+            hide(Q("#form"));
+            show(Q("#startGame"));
         }
     });
 }
+
+function canKill(p) {
+    if (Math.abs(me.x - p.x) < KILL_DISTANCE && Math.abs(me.y - p.y) < KILL_DISTANCE)
+        return true;
+    else
+        return false;
+}
+
+function killPlayer() {
+    for (const id in players) {
+        if (id != mySessionId) {
+            var p = players[id];
+            if (canKill(p)) {
+                g_room.send('killed', p.id)
+            }
+        }
+    }
+}
+
 var g_delta;
 function startGame() {
-    myRoom.send("start", "");
+    g_room.send("start", "");
     var startDiv = Q("#startGame");
     startDiv.style.display = 'none';
 }
@@ -511,4 +539,11 @@ function isCorridor(x, y) {
 		return true;
 	else
 		return false;
+}
+
+function hide(el) {
+	el.style.display = "none";
+}
+function show(el) {
+	el.style.display = "block";
 }

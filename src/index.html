@@ -9,14 +9,14 @@
 		<script src="victor.min.js"></script>
 		<style>
         * {padding: 0; margin: 0}
-        label, input, option, select {padding: 5px}
+        label, input, option, select {padding: 5px; margin: 2px; font-size: 24px}
 		</style>
 
 	</head>
 	<body>
-		<form id="form" style="padding: 5px; z-index:1; position: absolute; top: 30%; left: 50%; transform: translateX(-50%) translateY(-50%)">
-			<label for="name">Nickname</label>
-			<input type="text" id="name" value="" autofocus/>
+		<form id="form" style="text-align: center; background-color: #80808080; padding: 5px; z-index:1; position: absolute; top: 30%; left: 50%; transform: translateX(-50%) translateY(-50%)">
+			<label for="name">NICK: </label>
+			<input type="text" id="name" value="" autofocus style="width: 140px;"/>
 			<select id="color">
 				<option value="blue" style="background-color: blue!important;">blue</option>
 				<option value="black" style="color: white; background-color: black;">black</option>
@@ -43,6 +43,10 @@
 			<input id="startGame" type="submit" value="START" onclick="startGame()" style="display:none"/>
 		</div>
 		<div id="joyDiv" style="position: absolute; z-index: 2; left: 10px; bottom: 10px; width:100px;height:100px;margin-bottom:20px;display:none"></div>
+		<div id="actionsDiv" style="position: absolute; z-index: 2; right: 10px; bottom: 10px; width:100px;">
+			<input id="useItem" type="submit" value="USE" onclick="useItem()" style="display:none;"/>
+			<input id="killPlayer" type="submit" value="KILL" onclick="killPlayer()" style="display:none"/>
+		</div>
 		<img id="mapCorridorsImg" src="img/map-corridors.png" style="position: fixed; left: -10000; top: -10000; display: none;"/>
 		<canvas id="mapCorridorsCanvas" style="position: fixed; left: -10000; top: -10000; display: none;"/>
 		<script src="amongus-chase.js"></script>

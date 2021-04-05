@@ -44,6 +44,14 @@ exports.AmongUsChase = class extends colyseus.Room {
 			//console.log(pos.x, pos.y, now - last);
 			//last = now;
         });
+        this.onMessage("killed", (client, id) => {
+            var player = this.state.players.get(id);
+			if(!player.alive)
+				return;
+            player.alive = false;
+            this.alivePlayers--;
+            console.log("Player killed: " + player.name, this.alivePlayers);
+        });
         this.onMessage("start", (client, message) => {
             if(this.state.started) {
                 console.log("Atempt to start started game");
@@ -83,19 +91,6 @@ exports.AmongUsChase = class extends colyseus.Room {
     }
     update (deltaTime) {
         if(this.impostorPlayer && this.state.started) {
-            this.state.players.forEach((player) => {
-                if(player == this.impostorPlayer)
-                    return;
-                if(!player.alive)
-                    return;
-                if(Math.abs(player.x - this.impostorPlayer.x) > 30)
-                    return;
-                if(Math.abs(player.y - this.impostorPlayer.y) > 30)
-                    return;
-                player.alive = false;
-                this.alivePlayers--;
-                console.log("Player killed: " + player.name, this.alivePlayers);
-            });
             if(this.alivePlayers<=1) {
                 this.state.started = false;
                 console.log("Impostor won");
