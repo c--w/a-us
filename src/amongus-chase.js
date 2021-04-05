@@ -1,4 +1,7 @@
-var Q = document.querySelector; 
+var Q = document.querySelector.bind( document );
+var INPUT_RESPONSE_RATE = 0.1;
+var NON_SCROLLING_RATIO = 0.1;
+var PLAYER_SIZE = 48;
 var players = {};
 var players_length;
 var mySessionId;
@@ -64,7 +67,8 @@ app.loader.add([
         "img/violet-among-us.png",
         "img/yellow-among-us.png",
         "img/white-among-us.png",
-        "img/bckg.png"
+        "img/bckg.png",
+        "img/map.png"
     ])
 var trees = [];
 for(var i=0; i<50; i++) {
@@ -74,9 +78,8 @@ for(var i=0; i<50; i++) {
 app.loader.add(trees);
 app.loader.load(setup);
 function setup() {
-    tilingSprite = new PIXI.TilingSprite(app.loader.resources["img/bckg.png"].texture, app.screen.width, app.screen.height);
     container = new PIXI.Container();
-    app.stage.addChild(tilingSprite);
+	container.zIndex=1;
     let style = new PIXI.TextStyle({
         fontFamily: "Arial",
         fontSize: 16,
@@ -119,6 +122,7 @@ function setup() {
                 tree.x =obstacle.x-offset.x;
                 tree.y = obstacle.y-offset.y;
                 tree.width = tree.height = 30;
+				tree.zIndex = 2;
                 container.addChild(tree);
                 obstacle.sprite = tree;
 			})
@@ -182,11 +186,11 @@ function setup() {
             };
 			player.getBounds = getBoundsPlayer;
             let sprite = new PIXI.Sprite(app.loader.resources["img/" + (player.color || color) + "-among-us.png"].texture);
-            sprite.width = 32;
-            sprite.height = 32;
+            sprite.width = PLAYER_SIZE;
+            sprite.height = PLAYER_SIZE;
             sprite.anchor.x = 0.5;
             sprite.anchor.y = 0.5;
-            sprite.zIndex = 1;
+            sprite.zIndex = 5;
             player.sprite = sprite;
 
             var name = new PIXI.Text(player.name || nick, style);
@@ -197,8 +201,8 @@ function setup() {
                 me.s = new Victor(0, 0);
                 sprite.x = app.screen.width / 2;
                 sprite.y = app.screen.height / 2;
-                sprite.zIndex = 2;
-                name.zIndex = 2;
+                sprite.zIndex = 10;
+                name.zIndex = 10;
                 me.lx = me.x;
                 me.ly = me.y;
                 offset = {
@@ -218,13 +222,25 @@ function setup() {
                 graphics.zIndex=0;
                 graphics.lineStyle(10, 0x00ff00, 0.2);
                 graphics.beginFill(0xffffff, 0.0);
-                graphics.drawRect(-offset.x - 16, -offset.y - 16, 1032, 1032);
+                //graphics.beginTextureFill({texture: app.loader.resources["img/map.png"].texture});
+                graphics.drawRect(-offset.x - PLAYER_SIZE/2, -offset.y - PLAYER_SIZE/2, state.world_size_x + PLAYER_SIZE, state.world_size_y + PLAYER_SIZE);
                 graphics.endFill();
                 container.addChild(graphics);
+				if(state.game == "amongus")
+					var bckg = "img/map.png";
+				else
+					var bckg = "img/bckg.png";
+			    tilingSprite = new PIXI.Sprite(app.loader.resources[bckg].texture);
+				tilingSprite.zIndex=0;
+				tilingSprite.width = state.world_size_x;
+				tilingSprite.height = state.world_size_y;
+				tilingSprite.anchor.x = offset.x/tilingSprite.width;
+				tilingSprite.anchor.y = offset.y/tilingSprite.height;
+				app.stage.addChild(tilingSprite);
                 app.stage.addChild(container);
             } else if (offset) {
-                sprite.x = player.x - offset.x + tilingSprite.tilePosition.x;
-                sprite.y = player.y - offset.y + tilingSprite.tilePosition.y;
+                sprite.x = player.x - offset.x + tilingSprite.x;
+                sprite.y = player.y - offset.y + tilingSprite.y;
             } else {
                 sprite.x = app.screen.width / 2;
                 sprite.y = app.screen.height / 2;
@@ -286,8 +302,8 @@ function setup() {
                     var p = players[id];
                     //var new_sprite_x = p.x - offset.x + tilingSprite.tilePosition.x;
                     //var new_sprite_y = p.y - offset.y + tilingSprite.tilePosition.y;
-                    p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.tilePosition.x, 0.3);
-                    p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.tilePosition.y, 0.3);
+                    p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 0.3);
+                    p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.y, 0.3);
                     //var diffx = new_sprite_x - p.sprite.x;
                     //var diffy = new_sprite_y - p.sprite.y;
                     //p.sprite.x = lerp(new_sprite_x, p.sprite.x+diffx*2, 0.2);
@@ -302,20 +318,18 @@ function setup() {
                 return;
             }
 			
+			var futureMePos = {x: me.x, y: me.y, getBounds: getBoundsPlayer};
+            futureMePos.x += me.s.x;
+            futureMePos.y += me.s.y;
+
 			if(g_obstacles && g_obstacles.length) {
 				g_obstacles.forEach((obstacle) => {
-					var collision = colisionTest(me, obstacle);
+					var collision = colisionTest(futureMePos, obstacle);
                     if(collision) {
-                        if(!collision_flag) {
-                            collision_flag = 1;
-                            if(collision.x>collision.y)
-                                me.s.x*=-1;
-                            else
-                                me.s.y*=-1;
-                        } else if(collision_flag < 2)
-                            collision_flag++;
+						if(collision.x>collision.y)
+                            me.s.x*=0;
                         else
-                            collision_flag = 0;
+                            me.s.y*=0;
                     }
 				})
 			}
@@ -327,11 +341,11 @@ function setup() {
             if (me.ly < 0) {
                 me.ly = 0;
             }
-            if (me.lx > state.world_size) {
-                me.lx = state.world_size;
+            if (me.lx > state.world_size_x) {
+                me.lx = state.world_size_x;
             }
-            if (me.ly > state.world_size) {
-                me.ly = state.world_size;
+            if (me.ly > state.world_size_y) {
+                me.ly = state.world_size_y;
             }
             me.x = me.lx;
             me.y = me.ly;
@@ -341,20 +355,20 @@ function setup() {
             });
             //            var newx = me.sprite.x + me.s.x;
             //            var newy = me.sprite.y + me.s.y;
-            var newx = me.lx - offset.x + tilingSprite.tilePosition.x;
-            var newy = me.ly - offset.y + tilingSprite.tilePosition.y;
-            if (newx > app.screen.width / 4 && newx < app.screen.width / 4 * 3) {
+            var newx = me.lx - offset.x + tilingSprite.x;
+            var newy = me.ly - offset.y + tilingSprite.y;
+            if (newx > app.screen.width * NON_SCROLLING_RATIO && newx < app.screen.width * (1-NON_SCROLLING_RATIO)) {
                 me.sprite.x = newx;
                 me.tag.x = me.sprite.x;
             } else {
-                tilingSprite.tilePosition.x -= me.s.x;
+                tilingSprite.x -= me.s.x;
                 container.position.x -= me.s.x
             }
-            if (newy > app.screen.height / 4 && newy < app.screen.height / 4 * 3) {
+            if (newy > app.screen.height * NON_SCROLLING_RATIO && newy < app.screen.height * (1-NON_SCROLLING_RATIO)) {
                 me.sprite.y = newy;
                 me.tag.y = me.sprite.y - me.sprite.height;
             } else {
-                tilingSprite.tilePosition.y -= me.s.y;
+                tilingSprite.y -= me.s.y;
                 container.position.y -= me.s.y
             }
             var dv = getSpeed();
@@ -362,7 +376,7 @@ function setup() {
                 dv.normalize();
             dv.x *= rate * delta;
             dv.y *= rate * delta;
-            me.s.mix(dv, 0.01)
+            me.s.mix(dv, INPUT_RESPONSE_RATE)
             if (counter % 120 == 0) {
                 //var info = Q("#players");
                 //info.innerHTML = "me.s: " + me.s.length();
@@ -446,5 +460,5 @@ function getBounds() {
 	return {x: this.x-5, y:this.y-5, width: 10, height: 10};
 }
 function getBoundsPlayer() {
-	return {x: this.x-16, y:this.y-16, width: 32, height: 32};
+	return {x: this.x-PLAYER_SIZE/2, y:this.y-PLAYER_SIZE/2, width: PLAYER_SIZE, height: PLAYER_SIZE};
 }

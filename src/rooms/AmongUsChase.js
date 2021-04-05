@@ -4,6 +4,18 @@ const { State } = require('./schema/AmongUsChaseState');
 exports.AmongUsChase = class extends colyseus.Room {
     onCreate (options) {
         var state = new State();
+		var game = "chase";
+		if(process.argv[2] == "amongus") {
+			game = "amongus";
+		}
+		state.game = game;
+		if(game == "chase") {
+			state.world_size_x = state.world_size_y = 1000;
+			
+		} else {
+			state.world_size_x = 3660;
+			state.world_size_y = 2198;
+		}
         this.setState(state);
         this.impostorPlayer;
         this.alivePlayers=0;
@@ -37,14 +49,16 @@ exports.AmongUsChase = class extends colyseus.Room {
                 return;
             }
             console.log("Client", client.sessionId, " started the game");
-			var obstacles = [];
-			for(var i=0; i<15; i++) {
-				var obstacle = {};
-				obstacle.x = Math.random() * this.state.world_size;
-        		obstacle.y = Math.random() * this.state.world_size;
-				obstacles.push(obstacle);
+			if(game == "chase") {
+				var obstacles = [];
+				for(var i=0; i<15; i++) {
+					var obstacle = {};
+					obstacle.x = Math.random() * this.state.world_size_x;
+					obstacle.y = Math.random() * this.state.world_size_y;
+					obstacles.push(obstacle);
+				}
+				this.broadcast("obstacles", obstacles);
 			}
-			this.broadcast("obstacles", obstacles);
             var impostor = Math.floor(Math.random()*this.state.players.size);
             console.log("Impostor index: ", impostor)
             var i = 0;
@@ -114,8 +128,8 @@ exports.AmongUsChase = class extends colyseus.Room {
         console.log("Client joined: ", client.sessionId);
         var player = new Player();
         player.id = client.sessionId;
-        player.x = Math.random() * this.state.world_size;
-        player.y = Math.random() * this.state.world_size;
+        player.x = Math.random() * this.state.world_size_x;
+        player.y = Math.random() * this.state.world_size_y;
         player.alive = true;
         player.impostor = false;
         this.state.players.set(client.sessionId, player);

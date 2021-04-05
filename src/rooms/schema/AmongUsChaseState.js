@@ -21,15 +21,16 @@ State = class State extends schema.Schema {
         super();
         this.players = new schema.MapSchema();
         this.started = false;
-        this.world_size = 1000;
         this.elapsed = 0;
     }
 }
 schema.defineTypes(State, {
     players: { map: Player },
-    world_size: "number",
+    world_size_x: "number",
+    world_size_y: "number",
     started: "boolean",
-    elapsed: "uint8"
+    elapsed: "uint8",
+	game: "string"
 });
 
 exports.State = State;
