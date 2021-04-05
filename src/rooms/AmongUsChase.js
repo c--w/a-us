@@ -3,11 +3,12 @@ const { State } = require('./schema/AmongUsChaseState');
 
 exports.AmongUsChase = class extends colyseus.Room {
     onCreate (options) {
-        var state = new State();
+		console.log("ROOM created");
 		var game = "chase";
 		if(process.argv[2] == "amongus") {
 			game = "amongus";
 		}
+        var state = new State(game);
 		state.game = game;
 		if(game == "chase") {
 			state.world_size_x = state.world_size_y = 1000;
@@ -128,8 +129,13 @@ exports.AmongUsChase = class extends colyseus.Room {
         console.log("Client joined: ", client.sessionId);
         var player = new Player();
         player.id = client.sessionId;
-        player.x = Math.random() * this.state.world_size_x;
-        player.y = Math.random() * this.state.world_size_y;
+		if(this.state.game == "chase") {
+			player.x = Math.random() * this.state.world_size_x;
+			player.y = Math.random() * this.state.world_size_y;
+		} else {
+			player.x = Math.random() * 484 + 1734;
+			player.y = Math.random() * 78 + 236;
+		}
         player.alive = true;
         player.impostor = false;
         this.state.players.set(client.sessionId, player);

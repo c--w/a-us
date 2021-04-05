@@ -1,7 +1,11 @@
 var Q = document.querySelector.bind( document );
-var INPUT_RESPONSE_RATE = 0.1;
-var NON_SCROLLING_RATIO = 0.1;
+var INPUT_RESPONSE_RATE = 1;
+var NON_SCROLLING_RATIO = 0.3;
+var corridorR = 1;
+var corridorG = 2;
+var corridorB = 2;
 var PLAYER_SIZE = 48;
+var TEXT_COLOR = "black";
 var players = {};
 var players_length;
 var mySessionId;
@@ -12,7 +16,11 @@ var tilingSprite;
 var container;
 var myRoom;
 var graphics;
+var g_map;
 var g_obstacles;
+var style, styleImpostor;
+var g_game;
+
 var nick = getCookie("nick") || "";
 if (nick) {
     var nickInput = Q("#name");
@@ -77,28 +85,19 @@ for(var i=0; i<50; i++) {
 }
 app.loader.add(trees);
 app.loader.load(setup);
+app.stage.sortableChildren = true;
+
 function setup() {
     container = new PIXI.Container();
 	container.zIndex=1;
-    let style = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 16,
-        fill: "black",
-    });
-    let styleImpostor = new PIXI.TextStyle({
-        fontFamily: "Arial",
-        fontSize: 16,
-        fill: "red",
-    });
 
     var host = window.document.location.host.replace(/:.*/, '');
-
     var client = new Colyseus.Client(location.protocol.replace("http", "ws") + "//" + host + (location.port ? ':' + location.port : ''));
     client.joinOrCreate("amongus-chase").then(room => {
+        console.log("joined with ", room.sessionId);
         myRoom = room;
         state = room.state;
         mySessionId = room.sessionId;
-        console.log("joined with ", room.sessionId);
         room.onStateChange.once(function (state) {
             console.log("initial room state:", state);
             var info = Q("#players");
@@ -106,7 +105,7 @@ function setup() {
             state.players.$items.forEach(addPlayer);
             app.ticker.add(delta => gameLoop(delta));
         });
-		room.onMessage("obstacles", (obstacles) => {
+        room.onMessage("obstacles", (obstacles) => {
 			console.log("obstacles received");
             if(g_obstacles) {
                 g_obstacles.forEach((o) => {
@@ -132,8 +131,33 @@ function setup() {
         room.state.players.onRemove = removePlayer;
         room.state.onChange = stateChangeHandler;
         function stateChangeHandler(changes) {
+			if(!g_game) {
+				g_game = state.game;
+            if (state.game == "amongus") {
+                INPUT_RESPONSE_RATE = 1;
+                NON_SCROLLING_RATIO = 0.3;
+                PLAYER_SIZE = 48;
+                TEXT_COLOR = "white";
+            } else {
+                INPUT_RESPONSE_RATE = 0.01;
+                NON_SCROLLING_RATIO = 0.1;
+                PLAYER_SIZE = 32;
+                TEXT_COLOR = "black";
+            }
+            style = new PIXI.TextStyle({
+                fontFamily: "Arial",
+                fontSize: PLAYER_SIZE/2,
+                fill: TEXT_COLOR
+            });
+            styleImpostor = new PIXI.TextStyle({
+                fontFamily: "Arial",
+                fontSize: PLAYER_SIZE/2,
+                fill: "red"
+            });
+				
+			}
             for (var i = 0; i < changes.length; i++) {
-                console.log("stateChangeHandlere:", changes[i].field);
+                console.log("stateChangeHandler:", changes[i].field);
                 if (changes[i].field == "started") {
                     if (changes[i].value == true) {
                         console.log("GAME STARTED");
@@ -319,21 +343,29 @@ function setup() {
             }
 			
 			var futureMePos = {x: me.x, y: me.y, getBounds: getBoundsPlayer};
-            futureMePos.x += me.s.x;
-            futureMePos.y += me.s.y;
-
-			if(g_obstacles && g_obstacles.length) {
-				g_obstacles.forEach((obstacle) => {
-					var collision = colisionTest(futureMePos, obstacle);
-                    if(collision) {
-						if(collision.x>collision.y)
-                            me.s.x*=0;
-                        else
-                            me.s.y*=0;
-                    }
-				})
+			if (state.game == "chase") {
+				futureMePos.x += me.s.x;
+				futureMePos.y += me.s.y;
+			    if (g_obstacles && g_obstacles.length) {
+			        g_obstacles.forEach((obstacle) => {
+			            var collision = colisionTest(futureMePos, obstacle);
+			            if (collision) {
+			                if (collision.x > collision.y)
+			                    me.s.x *= 0;
+			                else
+			                    me.s.y *= 0;
+			            }
+			        })
+			    }
+			} else {
+				futureMePos.x += me.s.x*2;
+				if(!isCorridor(futureMePos.x, futureMePos.y))
+					me.s.x*= 0;
+				futureMePos.y += me.s.y*2;
+				if(!isCorridor(futureMePos.x, futureMePos.y))
+					me.s.y*= 0;
 			}
-            me.lx += me.s.x;
+			me.lx += me.s.x;
             me.ly += me.s.y;
             if (me.lx < 0) {
                 me.lx = 0;
@@ -461,4 +493,22 @@ function getBounds() {
 }
 function getBoundsPlayer() {
 	return {x: this.x-PLAYER_SIZE/2, y:this.y-PLAYER_SIZE/2, width: PLAYER_SIZE, height: PLAYER_SIZE};
+}
+
+document.getElementById("mapCorridorsImg").onload = function () {
+    var c = document.createElement("CANVAS");
+    var ctx = c.getContext("2d");
+    var img = document.getElementById("mapCorridorsImg");
+	c.width = img.width;
+	c.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    g_map = ctx;
+};
+
+function isCorridor(x, y) {
+	var rgbt = g_map.getImageData(x, y, 1, 1).data;
+	if(rgbt[0] == corridorR && rgbt[1] == corridorG && rgbt[2] == corridorB)
+		return true;
+	else
+		return false;
 }

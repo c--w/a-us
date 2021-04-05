@@ -17,11 +17,12 @@ schema.defineTypes(Player, {
 
 // Our custom game state, an ArraySchema of type Player only at the moment
 State = class State extends schema.Schema {
-    constructor() {
+    constructor(game) {
         super();
         this.players = new schema.MapSchema();
         this.started = false;
         this.elapsed = 0;
+		this.game = game;
     }
 }
 schema.defineTypes(State, {
