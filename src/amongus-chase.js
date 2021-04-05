@@ -1,0 +1,449 @@
+var nick = getCookie("nick") || "";
+if (nick) {
+    var nickInput = document.querySelector("#name");
+    nickInput.value = nick;
+}
+var color = getCookie("color") || "blue";
+if (color) {
+    var colorInput = document.querySelector("#color");
+    colorInput.value = color;
+}
+
+var mousePos = {
+    x: window.innerWidth/2,
+    y: window.innerHeight/2
+};
+var players = {};
+var players_length;
+var mySessionId;
+var me;
+var offset;
+var state;
+var tilingSprite;
+var container;
+var myRoom;
+var graphics;
+var g_obstacles;
+
+function isTouchDevice() {
+    return (('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0) ||
+        (navigator.msMaxTouchPoints > 0));
+}
+
+if (isTouchDevice()) {
+    var joyDiv = document.querySelector("#joyDiv");
+    joyDiv.style.display = 'block';
+    var joy = new JoyStick('joyDiv');
+} else {
+    window.addEventListener('mousemove', e => {
+        mousePos.x = e.offsetX;
+        mousePos.y = e.offsetY;
+    });
+}
+let app = new PIXI.Application();
+app.renderer.view.style.position = "absolute";
+app.renderer.view.style.display = "block";
+app.renderer.autoResize = true;
+app.renderer.backgroundColor = "0xffffff";
+
+app.renderer.resize(window.innerWidth, window.innerHeight);
+//Add the canvas that Pixi automatically created for you to the HTML document
+document.body.appendChild(app.view);
+app.loader.add([
+        "img/blue-among-us.png",
+        "img/black-among-us.png",
+        "img/brown-among-us.png",
+        "img/green-among-us.png",
+        "img/light-blue-among-us.png",
+        "img/lime-among-us.png",
+        "img/orange-among-us.png",
+        "img/red-among-us.png",
+        "img/rose-among-us.png",
+        "img/violet-among-us.png",
+        "img/yellow-among-us.png",
+        "img/white-among-us.png",
+        "img/bckg.png"
+    ])
+var trees = [];
+for(var i=0; i<50; i++) {
+    var num = ""+(i+1);
+    trees.push("img/"+num.padStart(3, "0")+"-tree.png");
+}
+app.loader.add(trees);
+app.loader.load(setup);
+function setup() {
+    tilingSprite = new PIXI.TilingSprite(app.loader.resources["img/bckg.png"].texture, app.screen.width, app.screen.height);
+    container = new PIXI.Container();
+    app.stage.addChild(tilingSprite);
+    let style = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 16,
+        fill: "black",
+    });
+    let styleImpostor = new PIXI.TextStyle({
+        fontFamily: "Arial",
+        fontSize: 16,
+        fill: "red",
+    });
+
+    var host = window.document.location.host.replace(/:.*/, '');
+
+    var client = new Colyseus.Client(location.protocol.replace("http", "ws") + "//" + host + (location.port ? ':' + location.port : ''));
+    client.joinOrCreate("amongus-chase").then(room => {
+        myRoom = room;
+        state = room.state;
+        mySessionId = room.sessionId;
+        console.log("joined with ", room.sessionId);
+        room.onStateChange.once(function (state) {
+            console.log("initial room state:", state);
+            var info = document.querySelector("#players");
+            info.innerHTML = "Players: " + state.players.$items.size;
+            state.players.$items.forEach(addPlayer);
+            app.ticker.add(delta => gameLoop(delta));
+        });
+		room.onMessage("obstacles", (obstacles) => {
+			console.log("obstacles received");
+            if(g_obstacles) {
+                g_obstacles.forEach((o) => {
+                    container.removeChild(o.sprite);
+                })
+            }
+			g_obstacles = obstacles;
+			obstacles.forEach((obstacle) => {
+                obstacle.getBounds = getBounds;
+                var textureKey = "img/"+(""+(Math.floor(Math.random()*50)+1)).padStart(3, "0")+"-tree.png";
+                const tree = new PIXI.Sprite(app.loader.resources[textureKey].texture);
+                tree.anchor.set(0.5);
+                tree.x =obstacle.x-offset.x;
+                tree.y = obstacle.y-offset.y;
+                tree.width = tree.height = 30;
+                container.addChild(tree);
+                obstacle.sprite = tree;
+			})
+			
+		});
+        room.state.players.onAdd = addPlayer;
+        room.state.players.onRemove = removePlayer;
+        room.state.onChange = stateChangeHandler;
+        function stateChangeHandler(changes) {
+            for (var i = 0; i < changes.length; i++) {
+                console.log("stateChangeHandlere:", changes[i].field);
+                if (changes[i].field == "started") {
+                    if (changes[i].value == true) {
+                        console.log("GAME STARTED");
+                        var message = document.querySelector("#message");
+                        message.style.display = "none";
+                    } else {
+                        var startDiv = document.querySelector("#startGame");
+                        startDiv.style.display = 'block';
+                        if (!me)
+                            return;
+                        console.log("GAME FINISHED");
+                        var message = document.querySelector("#message");
+                        message.style.display = "block";
+                        if (state.elapsed >= 100) {
+                            message.innerHTML = "IMPOSTOR FAILED";
+                            console.log("IMPOSTOR FAILED");
+                        } else {
+                            message.innerHTML = "IMPOSTOR WON";
+                            console.log("IMPOSTOR WON");
+                        }
+                        setTimeout(() => {
+                            var message = document.querySelector("#message");
+                            message.style.display = "none";
+                        }, 5000);
+                    }
+                } else if (changes[i].field == "elapsed") {
+                    var timeDiv = document.querySelector("#time");
+                    time.innerHTML = 100 - changes[i].value;
+                }
+
+            }
+
+        }
+        // new room state
+        room.onStateChange(function (state) {
+            // console.log("State changed: ", state);
+            if (players_length != state.players.$items.size) {
+                var info = document.querySelector("#players");
+                info.innerHTML = "Players: " + state.players.$items.size;
+                players_length = state.players.$items.size;
+            }
+        });
+        function addPlayer(player, sessionId) {
+            if (players[sessionId])
+                return;
+            console.log("addPlayer", player, sessionId);
+            players[sessionId] = player;
+            player.onChange = (changes) => {
+                playerChanged(player, changes)
+            };
+			player.getBounds = getBoundsPlayer;
+            let sprite = new PIXI.Sprite(app.loader.resources["img/" + (player.color || color) + "-among-us.png"].texture);
+            sprite.width = 32;
+            sprite.height = 32;
+            sprite.anchor.x = 0.5;
+            sprite.anchor.y = 0.5;
+            sprite.zIndex = 1;
+            player.sprite = sprite;
+
+            var name = new PIXI.Text(player.name || nick, style);
+            player.tag = name;
+            name.zIndex = 1;
+            if (player.id == mySessionId) {
+                me = player;
+                me.s = new Victor(0, 0);
+                sprite.x = app.screen.width / 2;
+                sprite.y = app.screen.height / 2;
+                sprite.zIndex = 2;
+                name.zIndex = 2;
+                me.lx = me.x;
+                me.ly = me.y;
+                offset = {
+                    x: me.x - sprite.x,
+                    y: me.y - sprite.y
+                }
+                for (const id in players) {
+                    if (id != mySessionId) {
+                        var p = players[id];
+                        p.sprite.x = p.x - offset.x;
+                        p.sprite.y = p.y - offset.y;
+                        p.tag.x = p.sprite.x;
+                        p.tag.y = p.sprite.y - p.sprite.height;
+                    }
+                }
+                graphics = new PIXI.Graphics();
+                graphics.zIndex=0;
+                graphics.lineStyle(10, 0x00ff00, 0.2);
+                graphics.beginFill(0xffffff, 0.0);
+                graphics.drawRect(-offset.x - 16, -offset.y - 16, 1032, 1032);
+                graphics.endFill();
+                container.addChild(graphics);
+                app.stage.addChild(container);
+            } else if (offset) {
+                sprite.x = player.x - offset.x + tilingSprite.tilePosition.x;
+                sprite.y = player.y - offset.y + tilingSprite.tilePosition.y;
+            } else {
+                sprite.x = app.screen.width / 2;
+                sprite.y = app.screen.height / 2;
+            }
+            name.x = sprite.x;
+            name.y = sprite.y - sprite.height;
+            name.anchor.x = 0.5;
+            name.anchor.y = 0.5;
+            app.stage.addChild(sprite);
+            app.stage.addChild(name);
+        }
+        function removePlayer(player, sessionId) {
+            console.log("removePlayer", player, sessionId);
+            var p = players[sessionId];
+            if (p) {
+                app.stage.removeChild(p.sprite);
+                app.stage.removeChild(p.tag);
+                delete players[sessionId];
+            }
+        }
+        function playerChanged(player, changes) {
+            //            console.log("playerChanged", changes.length);
+            for (var i = 0; i < changes.length; i++) {
+                if (changes[i].field == 'x' || changes[i].field == 'y') {
+                    continue;
+                } else if (changes[i].field == 'name') {
+                    player.name = changes[i].value;
+                    player.tag.text = player.name;
+                } else if (changes[i].field == 'color') {
+                    player.color = changes[i].value;
+                    player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
+                } else if (changes[i].field == 'impostor') {
+                    if (player.id != mySessionId)
+                        continue;
+                    player.impostor = changes[i].value;
+                    if (player.impostor)
+                        player.tag.style = styleImpostor;
+                    else
+                        player.tag.style = style;
+                } else if (changes[i].field == 'alive') {
+                    if (!player.alive)
+                        player.sprite.rotation = Math.PI / 2;
+                    if (player.alive)
+                        player.sprite.rotation = 0;
+                } else {
+                    console.log("playerChanged", changes[i].field);
+                }
+            }
+        }
+        var counter = 0;
+        var collision_flag;
+        function gameLoop(delta) {
+            g_delta = delta;
+            counter++;
+            if (!offset)
+                return;
+            for (const id in players) {
+                if (id != mySessionId) {
+                    var p = players[id];
+                    //var new_sprite_x = p.x - offset.x + tilingSprite.tilePosition.x;
+                    //var new_sprite_y = p.y - offset.y + tilingSprite.tilePosition.y;
+                    p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.tilePosition.x, 0.3);
+                    p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.tilePosition.y, 0.3);
+                    //var diffx = new_sprite_x - p.sprite.x;
+                    //var diffy = new_sprite_y - p.sprite.y;
+                    //p.sprite.x = lerp(new_sprite_x, p.sprite.x+diffx*2, 0.2);
+                    //p.sprite.y = lerp(new_sprite_y, p.sprite.y+diffy*2, 0.2);
+                    //p.sprite.x = new_sprite_x;
+                    //p.sprite.y = new_sprite_y;
+                    p.tag.x = p.sprite.x;
+                    p.tag.y = p.sprite.y - p.sprite.height;
+                }
+            }
+            if (!me.alive) {
+                return;
+            }
+			
+			if(g_obstacles && g_obstacles.length) {
+				g_obstacles.forEach((obstacle) => {
+					var collision = colisionTest(me, obstacle);
+                    if(collision) {
+                        if(!collision_flag) {
+                            collision_flag = 1;
+                            if(collision.x>collision.y)
+                                me.s.x*=-1;
+                            else
+                                me.s.y*=-1;
+                        } else if(collision_flag < 2)
+                            collision_flag++;
+                        else
+                            collision_flag = 0;
+                    }
+				})
+			}
+            me.lx += me.s.x;
+            me.ly += me.s.y;
+            if (me.lx < 0) {
+                me.lx = 0;
+            }
+            if (me.ly < 0) {
+                me.ly = 0;
+            }
+            if (me.lx > state.world_size) {
+                me.lx = state.world_size;
+            }
+            if (me.ly > state.world_size) {
+                me.ly = state.world_size;
+            }
+            me.x = me.lx;
+            me.y = me.ly;
+            room.send('pos', {
+                x: me.x,
+                y: me.y
+            });
+            //            var newx = me.sprite.x + me.s.x;
+            //            var newy = me.sprite.y + me.s.y;
+            var newx = me.lx - offset.x + tilingSprite.tilePosition.x;
+            var newy = me.ly - offset.y + tilingSprite.tilePosition.y;
+            if (newx > app.screen.width / 4 && newx < app.screen.width / 4 * 3) {
+                me.sprite.x = newx;
+                me.tag.x = me.sprite.x;
+            } else {
+                tilingSprite.tilePosition.x -= me.s.x;
+                container.position.x -= me.s.x
+            }
+            if (newy > app.screen.height / 4 && newy < app.screen.height / 4 * 3) {
+                me.sprite.y = newy;
+                me.tag.y = me.sprite.y - me.sprite.height;
+            } else {
+                tilingSprite.tilePosition.y -= me.s.y;
+                container.position.y -= me.s.y
+            }
+            var dv = getSpeed();
+            if (dv.length() > 1)
+                dv.normalize();
+            dv.x *= rate * delta;
+            dv.y *= rate * delta;
+            me.s.mix(dv, 0.01)
+            if (counter % 120 == 0) {
+                //var info = document.querySelector("#players");
+                //info.innerHTML = "me.s: " + me.s.length();
+            }
+        }
+        const rate = 4;
+        var curr_vec = new Victor(0, 0);
+        function getSpeed() {
+            if (joy) {
+                curr_vec.x = (joy.GetX());
+                curr_vec.y =  - (joy.GetY());
+                return curr_vec;
+            } else {
+                curr_vec.x = (mousePos.x - me.sprite.x);
+                curr_vec.y = (mousePos.y - me.sprite.y);
+                return curr_vec;
+            }
+        }
+        // send message to room on submit
+        document.querySelector("#form").onsubmit = function (e) {
+            e.preventDefault();
+
+            var input = document.querySelector("#name");
+            var select = document.querySelector("#color");
+
+            console.log("name:", input.value);
+
+            // send data to room
+            room.send("name", input.value);
+            setCookie("nick", input.value);
+            room.send("color", select.value);
+            setCookie("color", select.value);
+
+            var form = document.querySelector("#form");
+            form.style.display = 'none';
+            var startDiv = document.querySelector("#startGame");
+			startDiv.style.display = 'block';
+        }
+    });
+}
+var g_delta;
+function startGame() {
+    myRoom.send("start", "");
+    var startDiv = document.querySelector("#startGame");
+    startDiv.style.display = 'none';
+}
+var my_cookies;
+function getCookie(name) {
+    try {
+
+        if (!my_cookies) {
+            my_cookies = {};
+            var c = document.cookie;
+            var a = c.split(";");
+            a.forEach((key_value) => {
+                var tmp = key_value.split("=");
+                my_cookies[tmp[0].trim()] = tmp[1].trim();
+            });
+        }
+        return my_cookies[name];
+    } catch (e) {}
+}
+function setCookie(name, val) {
+    document.cookie = name + "=" + val;
+}
+const lerp = (a, b, t) => (b - a) * t + a;
+
+function colisionTest(object1, object2) {
+    var bounds1 = object1.getBounds();
+    var bounds2 = object2.getBounds();
+    var flagx = 1, flagy = 1;
+    if (bounds1.x >= bounds2.x + bounds2.width || bounds2.x >= bounds1.x + bounds1.width) 
+        return false;
+    if (bounds1.y >= bounds2.y + bounds2.height || bounds2.y>= bounds1.y+ bounds1.height)
+        return false;
+            
+    return {x: Math.abs(object1.x - object2.x), y: Math.abs(object1.y - object2.y)};
+}
+
+function getBounds() {
+	return {x: this.x-5, y:this.y-5, width: 10, height: 10};
+}
+function getBoundsPlayer() {
+	return {x: this.x-16, y:this.y-16, width: 32, height: 32};
+}
