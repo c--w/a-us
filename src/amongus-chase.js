@@ -1,18 +1,4 @@
-var nick = getCookie("nick") || "";
-if (nick) {
-    var nickInput = document.querySelector("#name");
-    nickInput.value = nick;
-}
-var color = getCookie("color") || "blue";
-if (color) {
-    var colorInput = document.querySelector("#color");
-    colorInput.value = color;
-}
-
-var mousePos = {
-    x: window.innerWidth/2,
-    y: window.innerHeight/2
-};
+var Q = document.querySelector; 
 var players = {};
 var players_length;
 var mySessionId;
@@ -24,6 +10,21 @@ var container;
 var myRoom;
 var graphics;
 var g_obstacles;
+var nick = getCookie("nick") || "";
+if (nick) {
+    var nickInput = Q("#name");
+    nickInput.value = nick;
+}
+var color = getCookie("color") || "blue";
+if (color) {
+    var colorInput = Q("#color");
+    colorInput.value = color;
+}
+
+var mousePos = {
+    x: window.innerWidth/2,
+    y: window.innerHeight/2
+};
 
 function isTouchDevice() {
     return (('ontouchstart' in window) ||
@@ -32,7 +33,7 @@ function isTouchDevice() {
 }
 
 if (isTouchDevice()) {
-    var joyDiv = document.querySelector("#joyDiv");
+    var joyDiv = Q("#joyDiv");
     joyDiv.style.display = 'block';
     var joy = new JoyStick('joyDiv');
 } else {
@@ -97,7 +98,7 @@ function setup() {
         console.log("joined with ", room.sessionId);
         room.onStateChange.once(function (state) {
             console.log("initial room state:", state);
-            var info = document.querySelector("#players");
+            var info = Q("#players");
             info.innerHTML = "Players: " + state.players.$items.size;
             state.players.$items.forEach(addPlayer);
             app.ticker.add(delta => gameLoop(delta));
@@ -132,15 +133,15 @@ function setup() {
                 if (changes[i].field == "started") {
                     if (changes[i].value == true) {
                         console.log("GAME STARTED");
-                        var message = document.querySelector("#message");
+                        var message = Q("#message");
                         message.style.display = "none";
                     } else {
-                        var startDiv = document.querySelector("#startGame");
+                        var startDiv = Q("#startGame");
                         startDiv.style.display = 'block';
                         if (!me)
                             return;
                         console.log("GAME FINISHED");
-                        var message = document.querySelector("#message");
+                        var message = Q("#message");
                         message.style.display = "block";
                         if (state.elapsed >= 100) {
                             message.innerHTML = "IMPOSTOR FAILED";
@@ -150,12 +151,12 @@ function setup() {
                             console.log("IMPOSTOR WON");
                         }
                         setTimeout(() => {
-                            var message = document.querySelector("#message");
+                            var message = Q("#message");
                             message.style.display = "none";
                         }, 5000);
                     }
                 } else if (changes[i].field == "elapsed") {
-                    var timeDiv = document.querySelector("#time");
+                    var timeDiv = Q("#time");
                     time.innerHTML = 100 - changes[i].value;
                 }
 
@@ -166,7 +167,7 @@ function setup() {
         room.onStateChange(function (state) {
             // console.log("State changed: ", state);
             if (players_length != state.players.$items.size) {
-                var info = document.querySelector("#players");
+                var info = Q("#players");
                 info.innerHTML = "Players: " + state.players.$items.size;
                 players_length = state.players.$items.size;
             }
@@ -363,7 +364,7 @@ function setup() {
             dv.y *= rate * delta;
             me.s.mix(dv, 0.01)
             if (counter % 120 == 0) {
-                //var info = document.querySelector("#players");
+                //var info = Q("#players");
                 //info.innerHTML = "me.s: " + me.s.length();
             }
         }
@@ -381,11 +382,11 @@ function setup() {
             }
         }
         // send message to room on submit
-        document.querySelector("#form").onsubmit = function (e) {
+        Q("#form").onsubmit = function (e) {
             e.preventDefault();
 
-            var input = document.querySelector("#name");
-            var select = document.querySelector("#color");
+            var input = Q("#name");
+            var select = Q("#color");
 
             console.log("name:", input.value);
 
@@ -395,9 +396,9 @@ function setup() {
             room.send("color", select.value);
             setCookie("color", select.value);
 
-            var form = document.querySelector("#form");
+            var form = Q("#form");
             form.style.display = 'none';
-            var startDiv = document.querySelector("#startGame");
+            var startDiv = Q("#startGame");
 			startDiv.style.display = 'block';
         }
     });
@@ -405,7 +406,7 @@ function setup() {
 var g_delta;
 function startGame() {
     myRoom.send("start", "");
-    var startDiv = document.querySelector("#startGame");
+    var startDiv = Q("#startGame");
     startDiv.style.display = 'none';
 }
 var my_cookies;
