@@ -66,40 +66,60 @@ exports.AmongUsChase = class extends colyseus.Room {
                 return;
             }
             console.log("Client", client.sessionId, " started the game");
-            if(game == "chase") {
-                var obstacles = [];
-                for(var i=0; i<15; i++) {
-                    var obstacle = {};
-                    obstacle.x = Math.random() * this.state.world_size_x;
-                    obstacle.y = Math.random() * this.state.world_size_y;
-                    obstacles.push(obstacle);
-                }
-                this.broadcast("obstacles", obstacles);
-            } else {
-
-            }
             var impostor = Math.floor(Math.random()*this.state.players.size);
             console.log("Impostor index: ", impostor)
-            var i = 0;
-            this.state.players.forEach((player) => {
-                if(impostor == i) {
-                    console.log("Impostor player: ", player.name)
-                    player.impostor = true;
-                    this.impostorPlayer = player;
-                } else {
-                    player.impostor = false;
-                }
-                i++;
-            });
             this.alivePlayers = this.state.players.size;
-            this.state.started = true;
-            this.startTime=new Date().getTime();
-            this.lastTime=this.startTime;
-            this.state.elapsed = 0;
+            if(game == "chase") {
+				this.startChase(impostor);
+            } else {
+				this.startAmongUs(impostor);
+            }
         });
 
     }
-    update (deltaTime) {
+	
+	startChase(impostor) {
+	    var obstacles = [];
+	    for (var i = 0; i < 15; i++) {
+	        var obstacle = {};
+	        obstacle.x = Math.random() * this.state.world_size_x;
+	        obstacle.y = Math.random() * this.state.world_size_y;
+	        obstacles.push(obstacle);
+	    }
+	    this.broadcast("obstacles", obstacles);
+	    this.state.started = true;
+	    this.startTime = new Date().getTime();
+	    this.lastTime = this.startTime;
+	    this.state.elapsed = 0;
+	    var i = 0;
+	    this.state.players.forEach((player) => {
+	        if (impostor == i) {
+	            console.log("Impostor player: ", player.name)
+	            player.impostor = true;
+	            this.impostorPlayer = player;
+	        } else {
+	            player.impostor = false;
+	        }
+	        i++;
+	    });
+
+	}
+	startAmongUs(impostor) {
+	    var i = 0;
+	    this.state.players.forEach((player) => {
+	        if (impostor == i) {
+	            console.log("Impostor player: ", player.name)
+	            player.impostor = true;
+	            this.impostorPlayer = player;
+	        } else {
+	            player.impostor = false;
+	            player.reported = false;
+	            player.completed = 0;
+	        }
+	        i++;
+	    });
+	}
+	update(deltaTime) {
         if(this.impostorPlayer && this.state.started) {
             if(this.alivePlayers <= this.ALIVE_IMPOSTOR_WIN) {
                 this.state.started = false;
@@ -161,7 +181,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         }
         player.alive = true;
         player.impostor = false;
-        if(game == "amongus") {
+        if(this.game == "amongus") {
             player.tasks = generateTasks(this.TASKS, this.TOTAL_TASKS);
             player.completed = 0;
         }

@@ -112,6 +112,10 @@ function setup() {
         g_room = room;
         state = room.state;
         mySessionId = room.sessionId;
+		room.onError((code, message) => {
+			console.log("oops, error ocurred:");
+			console.log(message);
+		});
         room.onStateChange.once(function (state) {
             console.log("initial room state:", state);
             var info = Q("#players");
@@ -182,18 +186,13 @@ function setup() {
                         if (!me)
                             return;
                         console.log("GAME FINISHED");
-                        var message = Q("#message");
-                        show(message);
-                        if (state.elapsed >= 100) {
-                            message.innerHTML = "IMPOSTOR FAILED";
+                        if (state.impostor_left || state.elapsed >= 100) {
+							showMessage("IMPOSTOR FAILED", 5000)
                             console.log("IMPOSTOR FAILED");
                         } else {
-                            message.innerHTML = "IMPOSTOR WON";
+							showMessage("IMPOSTOR WON", 5000)
                             console.log("IMPOSTOR WON");
                         }
-                        setTimeout(() => {
-                            hide(Q("#message"));
-                        }, 5000);
                     }
                 } else if (changes[i].field == "elapsed") {
                     var timeDiv = Q("#time");
@@ -340,13 +339,17 @@ function setup() {
 						if(canKill(p)) {
 							if(g_game == "chase") {
 								if(p.alive)
-									room.send('killed', p.id)
+									send('killed', p.id)
 							} else {
 								show(Q("#killPlayer"));
 							}
 						} else {
 							hide(Q("#killPlayer"));
 						}
+					} else {
+						if(canReport(p)) {
+							show(Q("#reportBody"));
+						}							
 					}
                     p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 0.3);
                     p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.y, 0.3);
@@ -354,15 +357,12 @@ function setup() {
                     p.tag.y = p.sprite.y - p.sprite.height;
                 }
             }
-            if (!me.alive) {
-                return;
-            }
 
-			var futureMePos = {x: me.x, y: me.y, getBounds: getBoundsPlayer};
+			var futureMePos = {x: me.lx, y: me.ly, getBounds: getBoundsPlayer};
 			if (state.game == "chase") {
 				futureMePos.x += me.s.x*2;
 				futureMePos.y += me.s.y*2;
-			    if (g_obstacles && g_obstacles.length) {
+			    if (me.alive && g_obstacles && g_obstacles.length) {
 			        g_obstacles.forEach((obstacle) => {
 			            var collision = colisionTest(futureMePos, obstacle);
 			            if (collision) {
@@ -373,14 +373,17 @@ function setup() {
 			            }
 			        })
 			    }
+
 			} else {
-				checkActions();
-				futureMePos.x += me.s.x*2;
-				if(!isCorridor(futureMePos.x, futureMePos.y))
-					me.s.x*= 0;
-				futureMePos.y += me.s.y*2;
-				if(!isCorridor(futureMePos.x, futureMePos.y))
-					me.s.y*= 0;
+			    checkActions();
+			    if (me.alive) {
+			        futureMePos.x += me.s.x * 2;
+			        if (me.alive && !isCorridor(futureMePos.x, futureMePos.y))
+			            me.s.x *= 0;
+			        futureMePos.y += me.s.y * 2;
+			        if (!isCorridor(futureMePos.x, futureMePos.y))
+			            me.s.y *= 0;
+			    }
 			}
 			me.lx += me.s.x;
             me.ly += me.s.y;
@@ -396,13 +399,15 @@ function setup() {
             if (me.ly > state.world_size_y) {
                 me.ly = state.world_size_y;
             }
-            me.x = me.lx;
-            me.y = me.ly;
-            room.send('pos', {
-                x: me.x,
-                y: me.y
-            });
-            //            var newx = me.sprite.x + me.s.x;
+			if (me.alive) {
+			    me.x = me.lx;
+			    me.y = me.ly;
+			    send('pos', {
+			        x: me.x,
+			        y: me.y
+			    });
+			}
+			//            var newx = me.sprite.x + me.s.x;
             //            var newy = me.sprite.y + me.s.y;
             var newx = me.lx - offset.x + tilingSprite.x;
             var newy = me.ly - offset.y + tilingSprite.y;
@@ -461,9 +466,9 @@ function setup() {
             console.log("name:", input.value);
 
             // send data to room
-            room.send("name", input.value);
+            send("name", input.value);
             setCookie("nick", input.value);
-            room.send("color", select.value);
+            send("color", select.value);
             setCookie("color", select.value);
 
             hide(Q("#form"));
@@ -472,8 +477,27 @@ function setup() {
     });
 }
 
+var g_disconnected = false;
+function send(type, data) {
+	if(g_room.connection.transport.ws.readyState == 1) {
+		g_room.send(type, data);
+	} else {
+		if(g_disconnected != true) {
+			console.log("SERVER is disconnected!")
+			showMessage("SERVER is disconnected!<br>Try refreshing the browser.", 10000)
+			g_disconnected = true;
+		}
+	}
+}
+
 function canKill(p) {
-    if (Math.abs(me.x - p.x) < KILL_DISTANCE && Math.abs(me.y - p.y) < KILL_DISTANCE)
+    if (Math.abs(me.lx - p.x) < KILL_DISTANCE && Math.abs(me.ly - p.y) < KILL_DISTANCE)
+        return true;
+    else
+        return false;
+}
+function canReport(p) {
+    if (me.alive && !p.alive && !p.reported && Math.abs(me.lx - p.x) < KILL_DISTANCE*2 && Math.abs(me.ly - p.y) < KILL_DISTANCE*2)
         return true;
     else
         return false;
@@ -484,7 +508,7 @@ function killPlayer() {
         if (id != mySessionId) {
             var p = players[id];
             if (canKill(p)) {
-                g_room.send('killed', p.id)
+                send('killed', p.id)
             }
         }
     }
@@ -492,7 +516,7 @@ function killPlayer() {
 
 var g_delta;
 function startGame() {
-    g_room.send("start", "");
+    send("start", "");
     var startDiv = Q("#startGame");
     startDiv.style.display = 'none';
 }
@@ -554,6 +578,14 @@ function isCorridor(x, y) {
 		return false;
 }
 
+function showMessage(msg, timeout) {
+    var messageDiv = Q("#message");
+    show(messageDiv);
+        messageDiv.innerHTML = msg;
+    setTimeout(() => {
+        hide(Q("#message"));
+    }, timeout);
+}
 function hide(el) {
 	el.style.display = "none";
 }

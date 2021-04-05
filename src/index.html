@@ -35,7 +35,7 @@
 		</form>
 		<div id="time" style="font-size: 24px; color: red; z-index:1; position: absolute; top: 5px; left: 50%; transform: translateX(-50%); background-color: #ffffff40 ">
 		</div>
-		<div id="message" style="font-size: 30px; color: red; z-index:1; position: absolute; top: 50%; left: 50%; transform: translateX(-50%) translateY(-50%); background-color: #ffffff40; display: none ">
+		<div id="message" style="background-color: #80808040; padding: 20px; font-size: 30px; color: red; z-index:1; position: absolute; top: 50%; left: 50%; transform: translateX(-50%) translateY(-50%); background-color: #ffffff40; display: none ">
 		</div>
 
 		<div id="info" style="z-index:1; position: absolute; top: 5px; right: 5px; background-color: #ffffff80 ">
@@ -44,8 +44,9 @@
 		</div>
 		<div id="joyDiv" style="position: absolute; z-index: 2; left: 10px; bottom: 10px; width:100px;height:100px;margin-bottom:20px;display:none"></div>
 		<div id="actionsDiv" style="position: absolute; z-index: 2; right: 10px; bottom: 10px; width:100px;">
-			<input id="useItem" type="submit" value="USE" onclick="useItem()" style="display:none;"/>
-			<input id="killPlayer" type="submit" value="KILL" onclick="killPlayer()" style="display:none"/>
+			<input id="useItem" type="submit" value="USE!" onclick="useItem()" style="display:none;"/>
+			<input id="killPlayer" type="submit" value="KILL!!" onclick="killPlayer()" style="display:none"/>
+			<input id="reportBody" type="submit" value="BODY!!! onclick="reportBody	()" style="display:none"/>
 		</div>
 		<img id="mapCorridorsImg" src="img/map-corridors.png" style="position: fixed; left: -10000; top: -10000; display: none;"/>
 		<canvas id="mapCorridorsCanvas" style="position: fixed; left: -10000; top: -10000; display: none;"/>

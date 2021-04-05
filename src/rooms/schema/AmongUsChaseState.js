@@ -11,6 +11,7 @@ schema.defineTypes(Player, {
     y: "number",
     impostor: "boolean",
     alive: "boolean",
+    reported: "boolean",
     name: "string",
     id: "string",
     color: "string",
