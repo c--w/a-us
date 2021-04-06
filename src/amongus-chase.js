@@ -1,9 +1,10 @@
 var Q = document.querySelector.bind( document );
 var INPUT_RESPONSE_RATE = 1;
 var NON_SCROLLING_RATIO = 0.3;
+var KILL_TIMEOUT=20;
 var corridorR = 1;
 var corridorG = 2;
-var corridorB = 2;
+var corridorB = 3;
 var PLAYER_SIZE = 48;
 var TEXT_COLOR = "black";
 var KILL_DISTANCE = 30;
@@ -22,6 +23,8 @@ var g_map;
 var g_obstacles;
 var style, styleImpostor;
 var g_game;
+var g_next_kill_time = 0;
+var g_time_to_kill_sec;
 var g_my_tasks = [];
 var TASKS = [
   {x: 1633, y: 273, name: "Wires"},
@@ -34,7 +37,6 @@ var TASKS = [
   {x: 3566, y: 1049, name: "Steering"},
   {x: 2524, y: 931, name: "O2 filter"}
 ]
-
 var nick = getCookie("nick") || "";
 
 if (nick) {
@@ -71,7 +73,6 @@ let app = new PIXI.Application();
 app.renderer.view.style.position = "absolute";
 app.renderer.view.style.display = "block";
 app.renderer.autoResize = true;
-app.renderer.backgroundColor = "0xffffff";
 
 app.renderer.resize(window.innerWidth, window.innerHeight);
 //Add the canvas that Pixi automatically created for you to the HTML document
@@ -102,6 +103,8 @@ app.loader.load(setup);
 app.stage.sortableChildren = true;
 
 function setup() {
+	
+	
     container = new PIXI.Container();
 	container.zIndex=1;
 
@@ -121,8 +124,17 @@ function setup() {
             var info = Q("#players");
             info.innerHTML = "Players: " + state.players.$items.size;
             state.players.$items.forEach(addPlayer);
-            app.ticker.add(delta => gameLoop(delta));
+			startWhenReady();
         });
+		
+		function startWhenReady() {
+			if(g_map) {
+				app.ticker.add(delta => gameLoop(delta));
+				//alert("loop")
+			} else {
+				setTimeout(startWhenReady, 100)
+			}
+		}
         room.onMessage("obstacles", (obstacles) => {
 			console.log("obstacles received");
             if(g_obstacles) {
@@ -145,58 +157,141 @@ function setup() {
 			})
 
 		});
-        room.state.players.onAdd = addPlayer;
+		room.onMessage("meeting", () => {
+		    newx = Math.random() * 484 + 1734;
+		    newy = Math.random() * 78 + 236;
+			var s = {x: newx - me.lx, y: newy - me.ly}
+			me.lx = me.x = newx;
+			me.ly = me.y = newy;
+			send('pos', {
+			    x: me.x,
+			    y: me.y
+			});
+
+			moveMySprite(s);
+			prepareMeeting();
+		})
+		
+		room.onMessage("vote", (vote) => {
+			var votesSpan = Q("#votes_"+vote.voted_id);
+			var p = players[vote.id];
+			votesSpan.innerHTML = votesSpan.innerHTML+'<img src="img/' + (p.color) + '-among-us.png" width="24" height="24"/>'
+		})
+		
+		function prepareMeeting() {
+			var div = Q("#meeting"); 
+			show(div);
+			var html = "";
+			html+= "<ul>"
+            for (const id in players) {
+				var p = players[id];
+				html+="<li>"
+				html+="<span>"
+				html+='<img src="img/' + (p.color) + '-among-us.png" width="48" height="48" style="vertical-align: middle"/>'
+				html+='<span>'+p.name+' : </span>'
+				html+='<span id="votes_'+id+'"></span>'
+				if(p.alive && me.alive)
+					html+='<input id="vote_'+id+'" type="submit" value="VOTE" onClick="vote(event)" style="float: right;"/>'
+				html+="</span>"
+				html+="</li>"
+            }
+			html+= "</ul>"
+			div.innerHTML = html;
+            for (const id in players) {
+                if (id != mySessionId) {
+                    var p = players[id];
+					if(!p.alive) {
+						p.reported = true;
+						p.sprite.zIndex = -1;
+						p.tag.zIndex = -1;
+					}
+				}
+			}
+		}
+
+		room.onMessage("IMPOSTOR WON", () => {
+		    showMessage("IMPOSTOR WON", 5000)
+		    console.log("IMPOSTOR WON");
+		})
+		room.onMessage("IMPOSTOR FAILED", () => {
+		    showMessage("WIN!!!", 5000)
+		    console.log("IMPOSTOR FAILED");
+		})
+		room.onMessage("IMPOSTOR LEFT", () => {
+		    showMessage("IMPOSTOR LEFT!<br>WIN!!!", 5000)
+		    console.log("IMPOSTOR LEFT");
+		})
+		room.onMessage("TASKS COMPLETED", () => {
+		    showMessage("TASKS COMPLETED!<br>WIN!!!", 5000)
+		    console.log("TASKS COMPLETED");
+		})
+		room.onMessage("TIE", () => {
+		    showMessage("TIE!", 2000)
+		    console.log("TIE");
+			hide(Q("#meeting")); 
+		})
+		room.onMessage("IMPOSTOR VOTED", (id) => {
+			var p = players[id];
+		    showMessage(p.name + " WAS THE IMPOSTOR!<br>WIN!!!", 5000)
+		    console.log(p.name + " WAS THE IMPOSTOR!<br>WIN!!!");
+			hide(Q("#meeting")); 
+		})
+		room.onMessage("CREWMATE VOTED", (id) => {
+			var p = players[id];
+		    showMessage(p.name + " WAS NOT IMPOSTOR!<br>:-(", 5000)
+		    console.log(p.name + " WAS NOT IMPOSTOR!<br>:-(");
+			hide(Q("#meeting")); 
+		})
+		
+		room.state.players.onAdd = addPlayer;
         room.state.players.onRemove = removePlayer;
         room.state.onChange = stateChangeHandler;
         function stateChangeHandler(changes) {
-			if(!g_game) {
-				g_game = state.game;
-            if (state.game == "amongus") {
-                INPUT_RESPONSE_RATE = 1;
-                NON_SCROLLING_RATIO = 0.3;
-                PLAYER_SIZE = 48;
-                TEXT_COLOR = "white";
-				KILL_DISTANCE = 60;
-            } else {
-                INPUT_RESPONSE_RATE = 0.01;
-                NON_SCROLLING_RATIO = 0.1;
-                PLAYER_SIZE = 32;
-                TEXT_COLOR = "black";
-            }
-            style = new PIXI.TextStyle({
-                fontFamily: "Arial",
-                fontSize: PLAYER_SIZE/2,
-                fill: TEXT_COLOR
-            });
-            styleImpostor = new PIXI.TextStyle({
-                fontFamily: "Arial",
-                fontSize: PLAYER_SIZE/2,
-                fill: "red"
-            });
+			if (!g_game) {
+			    g_game = state.game;
+			    if (state.game == "amongus") {
+			        INPUT_RESPONSE_RATE = 0.5;
+			        NON_SCROLLING_RATIO = 0.3;
+			        PLAYER_SIZE = 48;
+			        TEXT_COLOR = "white";
+			        KILL_DISTANCE = 60;
+					app.renderer.backgroundColor = "0x000000";
 
+			    } else {
+			        INPUT_RESPONSE_RATE = 0.01;
+			        NON_SCROLLING_RATIO = 0.1;
+			        PLAYER_SIZE = 32;
+			        TEXT_COLOR = "black";
+					app.renderer.backgroundColor = "0xffffff";
+			    }
+			    style = new PIXI.TextStyle({
+			        fontFamily: "Arial",
+			        fontSize: PLAYER_SIZE / 2,
+			        fill: TEXT_COLOR
+			    });
+			    styleImpostor = new PIXI.TextStyle({
+			        fontFamily: "Arial",
+			        fontSize: PLAYER_SIZE / 2,
+			        fill: "red"
+			    });
 			}
-            for (var i = 0; i < changes.length; i++) {
+			for (var i = 0; i < changes.length; i++) {
                 console.log("stateChangeHandler:", changes[i].field);
                 if (changes[i].field == "started") {
                     if (changes[i].value == true) {
                         console.log("GAME STARTED");
                         hide(Q("#message"));
+                        hide(Q("#startGame"));
+                        if (g_game == "amongus" && me.impostor) {
+                            g_next_kill_time = time() + KILL_TIMEOUT * 1000;
+                            show(Q("#time-to-kill"))
+                        }
                     } else {
                         show(Q("#startGame"));
-                        if (!me)
-                            return;
-                        console.log("GAME FINISHED");
-                        if (state.impostor_left || state.elapsed >= 100) {
-							showMessage("IMPOSTOR FAILED", 5000)
-                            console.log("IMPOSTOR FAILED");
-                        } else {
-							showMessage("IMPOSTOR WON", 5000)
-                            console.log("IMPOSTOR WON");
-                        }
                     }
                 } else if (changes[i].field == "elapsed") {
                     var timeDiv = Q("#time");
-                    time.innerHTML = 100 - changes[i].value;
+                    timeDiv.innerHTML = 100 - changes[i].value;
                 }
 
             }
@@ -211,6 +306,7 @@ function setup() {
                 players_length = state.players.$items.size;
             }
         });
+		
         function addPlayer(player, sessionId) {
             if (players[sessionId])
                 return;
@@ -228,16 +324,16 @@ function setup() {
             sprite.zIndex = 5;
             player.sprite = sprite;
 
-            var name = new PIXI.Text(player.name || nick, style);
+            var name = new PIXI.Text(nick || player.name || player.id, style);
             player.tag = name;
-            name.zIndex = 1;
+            player.tag.zIndex = 5;
             if (player.id == mySessionId) {
                 me = player;
                 me.s = new Victor(0, 0);
                 sprite.x = app.screen.width / 2;
                 sprite.y = app.screen.height / 2;
                 sprite.zIndex = 10;
-                name.zIndex = 10;
+                player.tag.zIndex = 10;
                 me.lx = me.x;
                 me.ly = me.y;
                 offset = {
@@ -253,18 +349,21 @@ function setup() {
                         p.tag.y = p.sprite.y - p.sprite.height;
                     }
                 }
-                graphics = new PIXI.Graphics();
-                graphics.zIndex=0;
-                graphics.lineStyle(10, 0x00ff00, 0.2);
-                graphics.beginFill(0xffffff, 0.0);
-                //graphics.beginTextureFill({texture: app.loader.resources["img/map.png"].texture});
-                graphics.drawRect(-offset.x - PLAYER_SIZE/2, -offset.y - PLAYER_SIZE/2, state.world_size_x + PLAYER_SIZE, state.world_size_y + PLAYER_SIZE);
-                graphics.endFill();
-                container.addChild(graphics);
-				if(state.game == "amongus")
+				if (state.game == "chase") {
+				}
+				if (state.game == "amongus")
 					var bckg = "img/map.png";
-				else
+				else {
+				    graphics = new PIXI.Graphics();
+				    graphics.zIndex = 0;
+				    graphics.lineStyle(10, 0x00ff00, 0.2);
+				    graphics.beginFill(0xffffff, 0.0);
+				    //graphics.beginTextureFill({texture: app.loader.resources["img/map.png"].texture});
+				    graphics.drawRect(-offset.x - PLAYER_SIZE / 2, -offset.y - PLAYER_SIZE / 2, state.world_size_x + PLAYER_SIZE, state.world_size_y + PLAYER_SIZE);
+				    graphics.endFill();
+				    container.addChild(graphics);
 					var bckg = "img/bckg.png";
+				}
 			    tilingSprite = new PIXI.Sprite(app.loader.resources[bckg].texture);
 				tilingSprite.zIndex=0;
 				tilingSprite.width = state.world_size_x;
@@ -303,7 +402,7 @@ function setup() {
                     continue;
                 } else if (changes[i].field == 'name') {
                     player.name = changes[i].value;
-                    player.tag.text = player.name;
+					player.tag.text = player.name;
                 } else if (changes[i].field == 'color') {
                     player.color = changes[i].value;
                     player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
@@ -316,10 +415,15 @@ function setup() {
                     else
                         player.tag.style = style;
                 } else if (changes[i].field == 'alive') {
-                    if (!player.alive)
+                    if (!player.alive) {
                         player.sprite.rotation = Math.PI / 2;
-                    if (player.alive)
+					} else {
+						if(player.me != player) {
+							player.sprite.zIndex=5;
+							player.tag.zIndex=5;
+						}	
                         player.sprite.rotation = 0;
+					}
                 } else {
                     console.log("playerChanged", changes[i].field);
                 }
@@ -328,36 +432,11 @@ function setup() {
         var counter = 0;
         var collision_flag;
         function gameLoop(delta) {
+			try {
             g_delta = delta;
             counter++;
             if (!offset)
                 return;
-            for (const id in players) {
-                if (id != mySessionId) {
-                    var p = players[id];
-					if (me.impostor) {
-						if(canKill(p)) {
-							if(g_game == "chase") {
-								if(p.alive)
-									send('killed', p.id)
-							} else {
-								show(Q("#killPlayer"));
-							}
-						} else {
-							hide(Q("#killPlayer"));
-						}
-					} else {
-						if(canReport(p)) {
-							show(Q("#reportBody"));
-						}							
-					}
-                    p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 0.3);
-                    p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.y, 0.3);
-                    p.tag.x = p.sprite.x;
-                    p.tag.y = p.sprite.y - p.sprite.height;
-                }
-            }
-
 			var futureMePos = {x: me.lx, y: me.ly, getBounds: getBoundsPlayer};
 			if (state.game == "chase") {
 				futureMePos.x += me.s.x*2;
@@ -375,6 +454,8 @@ function setup() {
 			    }
 
 			} else {
+				if(me.impostor)
+					updateTime2Kill();
 			    checkActions();
 			    if (me.alive) {
 			        futureMePos.x += me.s.x * 2;
@@ -407,25 +488,9 @@ function setup() {
 			        y: me.y
 			    });
 			}
-			//            var newx = me.sprite.x + me.s.x;
-            //            var newy = me.sprite.y + me.s.y;
-            var newx = me.lx - offset.x + tilingSprite.x;
-            var newy = me.ly - offset.y + tilingSprite.y;
-            if (newx > app.screen.width * NON_SCROLLING_RATIO && newx < app.screen.width * (1-NON_SCROLLING_RATIO)) {
-                me.sprite.x = newx;
-                me.tag.x = me.sprite.x;
-            } else {
-                tilingSprite.x -= me.s.x;
-                container.position.x -= me.s.x
-            }
-            if (newy > app.screen.height * NON_SCROLLING_RATIO && newy < app.screen.height * (1-NON_SCROLLING_RATIO)) {
-                me.sprite.y = newy;
-                me.tag.y = me.sprite.y - me.sprite.height;
-            } else {
-                tilingSprite.y -= me.s.y;
-                container.position.y -= me.s.y
-            }
-            var dv = getSpeed();
+			var flagJump = moveMySprite(me.s);
+			movePlayers(flagJump);
+			var dv = getSpeed();
             if (dv.length() > 1)
                 dv.normalize();
             dv.x *= rate * delta;
@@ -435,7 +500,87 @@ function setup() {
                 //var info = Q("#players");
                 //info.innerHTML = "me.s: " + me.s.length();
             }
+			} catch(e) {
+				alert(e);
+			}
         }
+		
+
+		function movePlayers(jump) {
+			var flagCanKill = false;
+			var flagCanReport = false;
+
+            for (const id in players) {
+                if (id != mySessionId) {
+                    var p = players[id];
+					if (me.impostor) {
+						if(canKill(p)) {
+							if(g_game == "chase") {
+								if(p.alive)
+									send('killed', p.id)
+							} else {
+								flagCanKill = true;
+							}
+						} 
+					} else {
+						if(g_game == "amongus" && canReport(p)) {
+							flagCanReport = true;
+						}							
+					}
+					if(jump) {
+						p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 1);
+						p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.y, 1);
+					} else {
+						if (p.sprite.x < p.x - offset.x + tilingSprite.x) {
+						    p.sprite.scale.x = -Math.abs(p.sprite.scale.x);
+						} else if (p.sprite.x > p.x - offset.x + tilingSprite.x) {
+						    p.sprite.scale.x = Math.abs(p.sprite.scale.x);
+						}
+						p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 0.3);
+						p.sprite.y = lerp(p.sprite.y, p.y - offset.y + tilingSprite.y, 0.3);
+					}
+                    p.tag.x = p.sprite.x;
+                    p.tag.y = p.sprite.y - p.sprite.height;
+                }
+            }
+			if(flagCanKill) {
+				show(Q("#killPlayer"));
+			} else {
+				hide(Q("#killPlayer"));
+			}
+			if(flagCanReport) {
+				show(Q("#reportBody"));
+			} else {
+				hide(Q("#reportBody"));
+			}
+		}
+		function moveMySprite(s) {
+			if(me.s.x>0) {
+				me.sprite.scale.x = -Math.abs(me.sprite.scale.x);
+			} else if(me.s.x<0) {
+				me.sprite.scale.x = Math.abs(me.sprite.scale.x);
+			} 
+			var flagJump = false;
+            var newx = me.lx - offset.x + tilingSprite.x;
+            var newy = me.ly - offset.y + tilingSprite.y;
+            if (newx > app.screen.width * NON_SCROLLING_RATIO && newx < app.screen.width * (1-NON_SCROLLING_RATIO)) {
+                me.sprite.x = newx;
+                me.tag.x = me.sprite.x;
+            } else {
+                tilingSprite.x -= s.x;
+                container.position.x -= s.x;
+				flagJump = true;
+            }
+            if (newy > app.screen.height * NON_SCROLLING_RATIO && newy < app.screen.height * (1-NON_SCROLLING_RATIO)) {
+                me.sprite.y = newy;
+                me.tag.y = me.sprite.y - me.sprite.height;
+            } else {
+                tilingSprite.y -= s.y;
+                container.position.y -= s.y
+				flagJump = true;
+            }
+			return flagJump;
+		}
 
 		function checkActions(p) {
 			g_my_tasks.forEach((task) => {
@@ -472,9 +617,17 @@ function setup() {
             setCookie("color", select.value);
 
             hide(Q("#form"));
-            show(Q("#startGame"));
+			if(!state.game.started)
+				show(Q("#startGame"));
         }
     });
+}
+
+function vote(event) {
+	var voteButton = event.target;
+	var tmp = voteButton.id.split("_");
+	send("vote", tmp[1])
+	voteButton.disabled = true;
 }
 
 var g_disconnected = false;
@@ -491,7 +644,7 @@ function send(type, data) {
 }
 
 function canKill(p) {
-    if (Math.abs(me.lx - p.x) < KILL_DISTANCE && Math.abs(me.ly - p.y) < KILL_DISTANCE)
+    if (g_next_kill_time == 0 && Math.abs(me.lx - p.x) < KILL_DISTANCE && Math.abs(me.ly - p.y) < KILL_DISTANCE)
         return true;
     else
         return false;
@@ -509,10 +662,23 @@ function killPlayer() {
             var p = players[id];
             if (canKill(p)) {
                 send('killed', p.id)
+				g_next_kill_time = time() + KILL_TIMEOUT * 1000;
             }
         }
     }
 }
+
+function reportBody() {
+    for (const id in players) {
+        if (id != mySessionId) {
+            var p = players[id];
+            if (canReport(p)) {
+                send('meeting', '')
+            }
+        }
+    }
+}
+
 
 var g_delta;
 function startGame() {
@@ -560,16 +726,6 @@ function getBoundsPlayer() {
 	return {x: this.x-PLAYER_SIZE/2, y:this.y-PLAYER_SIZE/2, width: PLAYER_SIZE, height: PLAYER_SIZE};
 }
 
-document.getElementById("mapCorridorsImg").onload = function () {
-    var c = document.createElement("CANVAS");
-    var ctx = c.getContext("2d");
-    var img = document.getElementById("mapCorridorsImg");
-	c.width = img.width;
-	c.height = img.height;
-    ctx.drawImage(img, 0, 0);
-    g_map = ctx;
-};
-
 function isCorridor(x, y) {
 	var rgbt = g_map.getImageData(x, y, 1, 1).data;
 	if(rgbt[0] == corridorR && rgbt[1] == corridorG && rgbt[2] == corridorB)
@@ -578,6 +734,19 @@ function isCorridor(x, y) {
 		return false;
 }
 
+function updateTime2Kill() {
+	if(g_next_kill_time==0)
+		return;
+	var remaining = Math.floor((g_next_kill_time-time())/1000)
+	if(remaining != g_time_to_kill_sec) {
+		Q("#time-to-kill").innerHTML = remaining;
+		if(remaining == 0) {
+			g_next_kill_time = 0;
+			hide(Q("#time-to-kill"));
+		}
+	}
+	
+}
 function showMessage(msg, timeout) {
     var messageDiv = Q("#message");
     show(messageDiv);
@@ -590,5 +759,25 @@ function hide(el) {
 	el.style.display = "none";
 }
 function show(el) {
-	el.style.display = "block";
+	el.style.display = "inline-block";
 }
+
+function time() {
+	return new Date().getTime();
+}
+
+document.getElementById("mapCorridorsImg").onload = function () {
+	loadMap();
+};
+function loadMap() {
+	if(g_map)
+		return;
+    var c = document.createElement("CANVAS");
+    var ctx = c.getContext("2d");
+    var img = document.getElementById("mapCorridorsImg");
+    c.width = img.width;
+    c.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    g_map = ctx;
+}
+setTimeout(loadMap, 5000);

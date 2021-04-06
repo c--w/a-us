@@ -9,12 +9,19 @@
 		<script src="victor.min.js"></script>
 		<style>
         * {padding: 0; margin: 0}
-        label, input, option, select {padding: 5px; margin: 2px; font-size: 24px}
+			label, input, option, select, div {
+			padding: 5px; 
+			margin: 2px; 
+			font-size: 24px;
+			text-shadow: 0px 0px 0px #888;}
+		li {
+			padding: 2px;
+		}
 		</style>
 
 	</head>
 	<body>
-		<form id="form" style="text-align: center; background-color: #80808080; padding: 5px; z-index:1; position: absolute; top: 30%; left: 50%; transform: translateX(-50%) translateY(-50%)">
+		<form id="form" style="text-align: center; padding: 5px; z-index:1; position: absolute; top: 30%; left: 50%; transform: translateX(-50%) translateY(-50%)">
 			<label for="name">NICK: </label>
 			<input type="text" id="name" value="" autofocus style="width: 140px;"/>
 			<select id="color">
@@ -33,24 +40,27 @@
 			</select>       
 			<input type="submit" value="JOIN" />
 		</form>
-		<div id="time" style="font-size: 24px; color: red; z-index:1; position: absolute; top: 5px; left: 50%; transform: translateX(-50%); background-color: #ffffff40 ">
+		<div id="time" style="font-size: 30px; color: red; z-index:1; position: absolute; top: 5px; left: 50%; transform: translateX(-50%);  ">
 		</div>
-		<div id="message" style="background-color: #80808040; padding: 20px; font-size: 30px; color: red; z-index:1; position: absolute; top: 50%; left: 50%; transform: translateX(-50%) translateY(-50%); background-color: #ffffff40; display: none ">
+		<div id="message" style="text-align: center; background-color: #80808040; padding: 20px; font-size: 30px; color: red; z-index:1; position: absolute; top: 50%; left: 50%; transform: translateX(-50%) translateY(-50%); background-color: #ffffff40; display: none ">
+		</div>
+		<div id="meeting" style="z-index: 100; background-color: #fffffff0; font-size: 30px; color: black; position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none">
+			TEST
 		</div>
 
-		<div id="info" style="z-index:1; position: absolute; top: 5px; right: 5px; background-color: #ffffff80 ">
+		<div id="info" style="z-index:1; position: absolute; top: 5px; right: 5px;" >
 			<div id="players"></div>
 			<input id="startGame" type="submit" value="START" onclick="startGame()" style="display:none"/>
 		</div>
 		<div id="joyDiv" style="position: absolute; z-index: 2; left: 10px; bottom: 10px; width:100px;height:100px;margin-bottom:20px;display:none"></div>
-		<div id="actionsDiv" style="position: absolute; z-index: 2; right: 10px; bottom: 10px; width:100px;">
+		<div id="actionsDiv" style="position: absolute; z-index: 2; right: 10px; bottom: 10px; width:200px; text-align: right;">
+			<div id="time-to-kill" style="font-size: 30px; color: red; display:none; background-color: #ffffff40"></div>
 			<input id="useItem" type="submit" value="USE!" onclick="useItem()" style="display:none;"/>
 			<input id="killPlayer" type="submit" value="KILL!!" onclick="killPlayer()" style="display:none"/>
-			<input id="reportBody" type="submit" value="BODY!!! onclick="reportBody	()" style="display:none"/>
+			<input id="reportBody" type="submit" value="BODY!!!" onclick="reportBody()" style="display:none"/>
 		</div>
-		<img id="mapCorridorsImg" src="img/map-corridors.png" style="position: fixed; left: -10000; top: -10000; display: none;"/>
+		<img id="mapCorridorsImg" src="img/map-corridors.png" loading="eager" style="position: fixed; left: -10000; top: -10000; display: none;"/>
 		<canvas id="mapCorridorsCanvas" style="position: fixed; left: -10000; top: -10000; display: none;"/>
 		<script src="amongus-chase.js"></script>
-
 	</body>
 </html>

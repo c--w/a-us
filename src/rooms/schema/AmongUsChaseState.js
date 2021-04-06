@@ -11,7 +11,6 @@ schema.defineTypes(Player, {
     y: "number",
     impostor: "boolean",
     alive: "boolean",
-    reported: "boolean",
     name: "string",
     id: "string",
     color: "string",
@@ -27,7 +26,6 @@ State = class State extends schema.Schema {
         this.started = false;
         this.elapsed = 0;
 		this.game = game;
-        this.impostor_left = false;
     }
 }
 schema.defineTypes(State, {
@@ -37,7 +35,6 @@ schema.defineTypes(State, {
     started: "boolean",
     elapsed: "uint8",
 	game: "string",
-    impostor_left: "boolean"
 });
 
 exports.State = State;

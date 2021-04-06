@@ -26,7 +26,6 @@ exports.AmongUsChase = class extends colyseus.Room {
         this.startTime=0;
         this.lastTime=0;
 
-        console.log(this.state);
         this.setSimulationInterval((deltaTime) => this.update(deltaTime));
         this.setPatchRate(50);
         this.onMessage("name", (client, message) => {
@@ -50,7 +49,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         this.onMessage("killed", (client, id) => {
             var player = this.state.players.get(id);
             if(!player.alive)
-            return;
+				return;
             player.alive = false;
             this.alivePlayers--;
             console.log("Player killed: " + player.name, this.alivePlayers);
@@ -59,6 +58,53 @@ exports.AmongUsChase = class extends colyseus.Room {
             var player = this.state.players.get(client.sessionId);
             player.completed = completed;
             console.log("Player ", player.name, " completed ", this.completed);
+        });
+        this.onMessage("meeting", (client, ignore) => {
+            var playerCalledMeeting = this.state.players.get(client.sessionId);
+            this.broadcast("meeting", '')
+			console.log("Player ", playerCalledMeeting.name, " called meeting ");
+			this.votes = 0;
+		});
+        this.onMessage("vote", (client, voted_id) => {
+            var voting_player = this.state.players.get(client.sessionId);
+			var voted_player = this.state.players.get(voted_id);
+			voted_player.votes=(voted_player.votes || 0) + 1; 
+            this.broadcast("vote", {id: client.sessionId, voted_id: voted_id})
+			console.log("Player", voting_player.name, "voted for", voted_player.name);
+			this.votes++;
+			if(this.votes == this.alivePlayers) {
+				var max = 0;
+				var max_votes_player_id;
+				var tie = false;
+				this.state.players.forEach((player, key) => {
+					if(player.votes > max) {
+						max = player.votes;
+						max_votes_player_id = key;
+						tie = false;
+					} else if(player.votes == max && max!=0) {
+						tie = true;
+					}
+					player.votes = 0;
+				})
+				if(tie) {
+					this.broadcast("TIE", "");
+				} else {
+					var max_votes_player = this.state.players.get(max_votes_player_id);
+					if(max_votes_player.impostor) {
+						this.broadcast("IMPOSTOR VOTED", max_votes_player_id);
+						console.log("Impostor voted out!");
+						this.state.started = false;
+		                setTimeout(this.revivePlayers, 3000, this)
+					} else {
+						this.broadcast("CREWMATE VOTED", max_votes_player_id);
+						max_votes_player.alive = false;
+						this.alivePlayers--;
+						console.log("Player", max_votes_player.name, "voted out!");
+					}
+				}
+			} else {
+				console.log(this.votes, this.alivePlayers)
+			}
         });
         this.onMessage("start", (client, message) => {
             if(this.state.started) {
@@ -79,20 +125,20 @@ exports.AmongUsChase = class extends colyseus.Room {
     }
 	
 	startChase(impostor) {
-	    var obstacles = [];
+	    this.obstacles = [];
 	    for (var i = 0; i < 15; i++) {
 	        var obstacle = {};
 	        obstacle.x = Math.random() * this.state.world_size_x;
 	        obstacle.y = Math.random() * this.state.world_size_y;
-	        obstacles.push(obstacle);
+	        this.obstacles.push(obstacle);
 	    }
-	    this.broadcast("obstacles", obstacles);
-	    this.state.started = true;
+	    this.broadcast("obstacles", this.obstacles);
 	    this.startTime = new Date().getTime();
 	    this.lastTime = this.startTime;
 	    this.state.elapsed = 0;
 	    var i = 0;
 	    this.state.players.forEach((player) => {
+			player.alive = true;
 	        if (impostor == i) {
 	            console.log("Impostor player: ", player.name)
 	            player.impostor = true;
@@ -102,39 +148,48 @@ exports.AmongUsChase = class extends colyseus.Room {
 	        }
 	        i++;
 	    });
+		setTimeout(() => {
+			this.state.started = true;
+		}, 500)
+	    
 
 	}
 	startAmongUs(impostor) {
 	    var i = 0;
 	    this.state.players.forEach((player) => {
+			player.alive = true;
 	        if (impostor == i) {
 	            console.log("Impostor player: ", player.name)
 	            player.impostor = true;
 	            this.impostorPlayer = player;
 	        } else {
 	            player.impostor = false;
-	            player.reported = false;
 	            player.completed = 0;
 	        }
 	        i++;
 	    });
+		setTimeout(() => {
+			this.state.started = true;
+		}, 500)
+	}
+	revivePlayers(self) {
+	    self.state.players.forEach((player) => {
+	        player.alive = true;
+	    });
+	    self.state.elapsed = 0;
 	}
 	update(deltaTime) {
         if(this.impostorPlayer && this.state.started) {
             if(this.alivePlayers <= this.ALIVE_IMPOSTOR_WIN) {
-                this.state.started = false;
                 console.log("Impostor won");
-                setTimeout(() => {
-                    this.state.players.forEach((player) => {
-                        player.alive = true;
-                    });
-                    this.state.elapsed = 0;
-                }, 3000)
-
-            } else if (this.state.game == "chase") {
-                checkTime();
+				this.broadcast("IMPOSTOR WON", "")
+			    this.state.started = false;
+				setTimeout(this.revivePlayers, 2000, this)
+				}
+				else if (this.state.game == "chase") {
+                this.checkTime();
             } else {
-                checkTasksCompleted()
+                this.checkTasksCompleted()
             }
         }
 
@@ -149,6 +204,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         });
         if(sum >= this.state.players.size * this.TASKS) {
             this.state.started = false;
+			this.broadcast("TASKS COMPLETED", "")
             console.log("Tasks completed");
         }
     }
@@ -160,6 +216,7 @@ exports.AmongUsChase = class extends colyseus.Room {
             this.lastTime = c;
         }
         if(this.state.elapsed >= 100) {
+			this.broadcast("IMPOSTOR FAILED", "")
             this.state.started = false;
             console.log("Time elapsed");
             setTimeout(() => {
@@ -172,6 +229,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         console.log("Client joined: ", client.sessionId);
         var player = new Player();
         player.id = client.sessionId;
+		player.name = player.id;
         if(this.state.game == "chase") {
             player.x = Math.random() * this.state.world_size_x;
             player.y = Math.random() * this.state.world_size_y;
@@ -179,14 +237,24 @@ exports.AmongUsChase = class extends colyseus.Room {
             player.x = Math.random() * 484 + 1734;
             player.y = Math.random() * 78 + 236;
         }
-        player.alive = true;
+		if(this.state.started) {
+			player.alive = false;
+		} else {
+			player.alive = true;
+			this.alivePlayers++;
+		}
         player.impostor = false;
         if(this.game == "amongus") {
             player.tasks = generateTasks(this.TASKS, this.TOTAL_TASKS);
             player.completed = 0;
-        }
+        } else {
+			if(this.state.started) {
+				setTimeout(() => {
+					client.send("obstacles", this.obstacles);
+				}, 500)
+			}
+		}
         this.state.players.set(client.sessionId, player);
-        this.alivePlayers++;
     }
 
     onLeave (client, consented) {
@@ -195,13 +263,13 @@ exports.AmongUsChase = class extends colyseus.Room {
         this.state.players.delete(client.sessionId);
         if (player.impostor) {
             console.log("Impostor left");
-            this.impostor_left = true;
+			this.broadcast("IMPOSTOR LEFT", "")
             setTimeout(() => {
                 this.state.started = false;
             }, 500)
             setTimeout(() => {
                 this.state.elapsed = 0;
-            }, 3000)
+            }, 1000)
         } else {
             if(player.alive)
                 this.alivePlayers--;
