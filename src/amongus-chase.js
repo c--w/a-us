@@ -258,8 +258,8 @@ function setup() {
 					app.renderer.backgroundColor = "0x000000";
 
 			    } else {
-			        INPUT_RESPONSE_RATE = 0.01;
-			        NON_SCROLLING_RATIO = 0.1;
+			        INPUT_RESPONSE_RATE = 0.02;
+			        NON_SCROLLING_RATIO = 0.25;
 			        PLAYER_SIZE = 32;
 			        TEXT_COLOR = "black";
 					app.renderer.backgroundColor = "0xffffff";
@@ -560,6 +560,7 @@ function setup() {
 			} else if(me.s.x<0) {
 				me.sprite.scale.x = Math.abs(me.sprite.scale.x);
 			} 
+			me.sprite.skew.x = -me.s.x/30;
 			var flagJump = false;
             var newx = me.lx - offset.x + tilingSprite.x;
             var newy = me.ly - offset.y + tilingSprite.y;
