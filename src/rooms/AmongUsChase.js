@@ -65,12 +65,22 @@ exports.AmongUsChase = class extends colyseus.Room {
 			console.log("Player ", playerCalledMeeting.name, " called meeting ");
 			this.votes = 0;
 		});
+        this.onMessage("chat", (client, msg) => {
+            var playerChatting = this.state.players.get(client.sessionId);
+            this.broadcast("chat", {id: client.sessionId, msg: msg})
+			console.log("Player ", playerChatting.name, "sent message", msg);
+			this.votes = 0;
+		});
         this.onMessage("vote", (client, voted_id) => {
             var voting_player = this.state.players.get(client.sessionId);
-			var voted_player = this.state.players.get(voted_id);
-			voted_player.votes=(voted_player.votes || 0) + 1; 
-            this.broadcast("vote", {id: client.sessionId, voted_id: voted_id})
-			console.log("Player", voting_player.name, "voted for", voted_player.name);
+            if(!voted_id) {
+                console.log("Player", voting_player.name, "skipped");
+            } else {
+                var voted_player = this.state.players.get(voted_id);
+                voted_player.votes=(voted_player.votes || 0) + 1;
+                this.broadcast("vote", {id: client.sessionId, voted_id: voted_id})
+                console.log("Player", voting_player.name, "voted for", voted_player.name);
+            }
 			this.votes++;
 			if(this.votes == this.alivePlayers) {
 				var max = 0;
@@ -123,7 +133,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         });
 
     }
-	
+
 	startChase(impostor) {
 	    this.obstacles = [];
 	    for (var i = 0; i < 15; i++) {
@@ -151,7 +161,7 @@ exports.AmongUsChase = class extends colyseus.Room {
 		setTimeout(() => {
 			this.state.started = true;
 		}, 500)
-	    
+
 
 	}
 	startAmongUs(impostor) {

@@ -1,4 +1,5 @@
-var Q = document.querySelector.bind( document );
+var Q = document.querySelector.bind(document);
+var QA = document.querySelectorAll.bind(document)
 var INPUT_RESPONSE_RATE = 1;
 var NON_SCROLLING_RATIO = 0.3;
 var KILL_TIMEOUT=20;
@@ -9,7 +10,7 @@ var PLAYER_SIZE = 48;
 var TEXT_COLOR = "black";
 var KILL_DISTANCE = 30;
 var TASKS
-var players = {};
+var g_players = {};
 var players_length;
 var mySessionId;
 var me;
@@ -27,16 +28,21 @@ var g_next_kill_time = 0;
 var g_time_to_kill_sec;
 var g_my_tasks = [];
 var TASKS = [
-  {x: 1633, y: 273, name: "Wires"},
-  {x: 2332, y: 300, name: "Download"},
-  {x: 811, y: 1061, name: "Wires"},
-  {x: 2413, y: 381, name: "Garbage"},
-  {x: 1585, y: 1293, name: "Distributor"},
-  {x: 1335, y: 1276, name: "Power"},
-  {x: 2914, y: 1501, name: "Accept Power"},
-  {x: 3566, y: 1049, name: "Steering"},
-  {x: 2524, y: 931, name: "O2 filter"}
+  {x: 1633, y: 273, name: "Wires", type: "task"},
+  {x: 2332, y: 300, name: "Download", type: "task"},
+  {x: 811, y: 1061, name: "Wires", type: "task"},
+  {x: 2413, y: 381, name: "Garbage", type: "task"},
+  {x: 1585, y: 1293, name: "Distributor", type: "task"},
+  {x: 1335, y: 1276, name: "Power", type: "task"},
+  {x: 2914, y: 1501, name: "Accept Power", type: "task"},
+  {x: 3566, y: 1049, name: "Steering", type: "task"},
+  {x: 2524, y: 931, name: "O2 filter", type: "task"}
 ]
+var SPECIAL_ITEMS = {
+    {x: 1987, y: 612, name: "Meeting", type: "meeting"}
+}
+var ALL_ITEMS = TASKS.concat(SPECIAL_ITEMS);
+
 var nick = getCookie("nick") || "";
 
 if (nick) {
@@ -100,11 +106,21 @@ for(var i=0; i<50; i++) {
 }
 app.loader.add(trees);
 app.loader.load(setup);
+var g_loaded=0;
+var g_total_resources = 64;
+app.loader.onProgress.add(() => {
+    g_loaded++;
+    if(g_loaded < g_total_resources)
+        showMessage("Loading... "+g_loaded+"/"+g_total_resources);
+    else
+        showMessage("DONE", 1000);
+}); // called once per loaded/errored file
+
 app.stage.sortableChildren = true;
 
 function setup() {
-	
-	
+
+
     container = new PIXI.Container();
 	container.zIndex=1;
 
@@ -121,16 +137,14 @@ function setup() {
 		});
         room.onStateChange.once(function (state) {
             console.log("initial room state:", state);
-            var info = Q("#players");
-            info.innerHTML = "Players: " + state.players.$items.size;
             state.players.$items.forEach(addPlayer);
 			startWhenReady();
         });
-		
+
 		function startWhenReady() {
 			if(g_map) {
 				app.ticker.add(delta => gameLoop(delta));
-				//alert("loop")
+                show(Q("#form"));
 			} else {
 				setTimeout(startWhenReady, 100)
 			}
@@ -171,78 +185,55 @@ function setup() {
 			moveMySprite(s);
 			prepareMeeting();
 		})
-		
+
 		room.onMessage("vote", (vote) => {
 			var votesSpan = Q("#votes_"+vote.voted_id);
-			var p = players[vote.id];
-			votesSpan.innerHTML = votesSpan.innerHTML+'<img src="img/' + (p.color) + '-among-us.png" width="24" height="24"/>'
+			var p = g_players[vote.id];
+			votesSpan.innerHTML = votesSpan.innerHTML+'<img src="img/' + (p.color) + '-among-us.png" width="24" height="24" style="vertical-align: middle"/>'
 		})
-		
-		function prepareMeeting() {
-			var div = Q("#meeting"); 
-			show(div);
-			var html = "";
-			html+= "<ul>"
-            for (const id in players) {
-				var p = players[id];
-				html+="<li>"
-				html+="<span>"
-				html+='<img src="img/' + (p.color) + '-among-us.png" width="48" height="48" style="vertical-align: middle"/>'
-				html+='<span>'+p.name+' : </span>'
-				html+='<span id="votes_'+id+'"></span>'
-				if(p.alive && me.alive)
-					html+='<input id="vote_'+id+'" type="submit" value="VOTE" onClick="vote(event)" style="float: right;"/>'
-				html+="</span>"
-				html+="</li>"
-            }
-			html+= "</ul>"
-			div.innerHTML = html;
-            for (const id in players) {
-                if (id != mySessionId) {
-                    var p = players[id];
-					if(!p.alive) {
-						p.reported = true;
-						p.sprite.zIndex = -1;
-						p.tag.zIndex = -1;
-					}
-				}
-			}
-		}
+
+        room.onMessage("chat", (msgObj) => {
+			var chat_output = Q("#chat_output");
+			var p = g_players[msgObj.id];
+			chat_output.innerHTML = '<div>'+p.name+': '+msgObj.msg+'</div>' + chat_output.innerHTML;
+		})
 
 		room.onMessage("IMPOSTOR WON", () => {
-		    showMessage("IMPOSTOR WON", 5000)
+		    showMessage("IMPOSTOR WON!", 5000)
 		    console.log("IMPOSTOR WON");
 		})
 		room.onMessage("IMPOSTOR FAILED", () => {
-		    showMessage("WIN!!!", 5000)
+		    showMessage("CREWMATE WIN!!!", 5000)
 		    console.log("IMPOSTOR FAILED");
 		})
 		room.onMessage("IMPOSTOR LEFT", () => {
-		    showMessage("IMPOSTOR LEFT!<br>WIN!!!", 5000)
+		    showMessage("IMPOSTOR LEFT!<br>CREWMATE WIN!!!", 5000)
 		    console.log("IMPOSTOR LEFT");
 		})
 		room.onMessage("TASKS COMPLETED", () => {
-		    showMessage("TASKS COMPLETED!<br>WIN!!!", 5000)
+		    showMessage("TASKS COMPLETED!<br>CREWMATE WIN!!!", 5000)
 		    console.log("TASKS COMPLETED");
 		})
 		room.onMessage("TIE", () => {
 		    showMessage("TIE!", 2000)
 		    console.log("TIE");
-			hide(Q("#meeting")); 
+			hide(Q("#meeting"));
 		})
 		room.onMessage("IMPOSTOR VOTED", (id) => {
-			var p = players[id];
-		    showMessage(p.name + " WAS THE IMPOSTOR!<br>WIN!!!", 5000)
-		    console.log(p.name + " WAS THE IMPOSTOR!<br>WIN!!!");
-			hide(Q("#meeting")); 
+			var p = g_players[id];
+		    showMessage(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!", 5000)
+		    console.log(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!");
+			hide(Q("#meeting"));
 		})
 		room.onMessage("CREWMATE VOTED", (id) => {
-			var p = players[id];
+			var p = g_players[id];
+            p.reported = true;
+            p.sprite.zIndex = -1;
 		    showMessage(p.name + " WAS NOT IMPOSTOR!<br>:-(", 5000)
 		    console.log(p.name + " WAS NOT IMPOSTOR!<br>:-(");
-			hide(Q("#meeting")); 
+			hide(Q("#meeting"));
 		})
-		
+
 		room.state.players.onAdd = addPlayer;
         room.state.players.onRemove = removePlayer;
         room.state.onChange = stateChangeHandler;
@@ -256,23 +247,26 @@ function setup() {
 			        TEXT_COLOR = "white";
 			        KILL_DISTANCE = 60;
 					app.renderer.backgroundColor = "0x000000";
-
+                    hide(Q("#time"));
 			    } else {
 			        INPUT_RESPONSE_RATE = 0.02;
 			        NON_SCROLLING_RATIO = 0.25;
 			        PLAYER_SIZE = 32;
 			        TEXT_COLOR = "black";
 					app.renderer.backgroundColor = "0xffffff";
+                    show(Q("#time"));
 			    }
 			    style = new PIXI.TextStyle({
 			        fontFamily: "Arial",
 			        fontSize: PLAYER_SIZE / 2,
-			        fill: TEXT_COLOR
+			        fill: TEXT_COLOR,
+                    strokeThickness: 2
 			    });
 			    styleImpostor = new PIXI.TextStyle({
 			        fontFamily: "Arial",
 			        fontSize: PLAYER_SIZE / 2,
-			        fill: "red"
+			        fill: "red",
+                    strokeThickness: 4
 			    });
 			}
 			for (var i = 0; i < changes.length; i++) {
@@ -285,7 +279,13 @@ function setup() {
                         if (g_game == "amongus" && me.impostor) {
                             g_next_kill_time = time() + KILL_TIMEOUT * 1000;
                             show(Q("#time-to-kill"))
+                            showMessage("IMPOSTOR", 2000)
                         }
+                        if(me.impostor)
+                            showMessage("IMPOSTOR", 2000)
+                        else
+                            showMessage("CREWMATE", 2000)
+
                     } else {
                         show(Q("#startGame"));
                     }
@@ -300,23 +300,19 @@ function setup() {
         // new room state
         room.onStateChange(function (state) {
             // console.log("State changed: ", state);
-            if (players_length != state.players.$items.size) {
-                var info = Q("#players");
-                info.innerHTML = "Players: " + state.players.$items.size;
-                players_length = state.players.$items.size;
-            }
         });
-		
+
         function addPlayer(player, sessionId) {
-            if (players[sessionId])
+            if (g_players[sessionId])
                 return;
             console.log("addPlayer", player, sessionId);
-            players[sessionId] = player;
+            player.color = player.color || "blue";
+            g_players[sessionId] = player;
             player.onChange = (changes) => {
                 playerChanged(player, changes)
             };
 			player.getBounds = getBoundsPlayer;
-            let sprite = new PIXI.Sprite(app.loader.resources["img/" + (player.color || color) + "-among-us.png"].texture);
+            let sprite = new PIXI.Sprite(app.loader.resources["img/" + (player.color) + "-among-us.png"].texture);
             sprite.width = PLAYER_SIZE;
             sprite.height = PLAYER_SIZE;
             sprite.anchor.x = 0.5;
@@ -340,9 +336,9 @@ function setup() {
                     x: me.x - sprite.x,
                     y: me.y - sprite.y
                 }
-                for (const id in players) {
+                for (const id in g_players) {
                     if (id != mySessionId) {
-                        var p = players[id];
+                        var p = g_players[id];
                         p.sprite.x = p.x - offset.x;
                         p.sprite.y = p.y - offset.y;
                         p.tag.x = p.sprite.x;
@@ -385,15 +381,17 @@ function setup() {
             name.anchor.y = 0.5;
             app.stage.addChild(sprite);
             app.stage.addChild(name);
+            showPlayers();
         }
         function removePlayer(player, sessionId) {
             console.log("removePlayer", player, sessionId);
-            var p = players[sessionId];
+            var p = g_players[sessionId];
             if (p) {
                 app.stage.removeChild(p.sprite);
                 app.stage.removeChild(p.tag);
-                delete players[sessionId];
+                delete g_players[sessionId];
             }
+            showPlayers();
         }
         function playerChanged(player, changes) {
             //            console.log("playerChanged", changes.length);
@@ -403,9 +401,11 @@ function setup() {
                 } else if (changes[i].field == 'name') {
                     player.name = changes[i].value;
 					player.tag.text = player.name;
+                    showPlayers();
                 } else if (changes[i].field == 'color') {
                     player.color = changes[i].value;
                     player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
+                    showPlayers();
                 } else if (changes[i].field == 'impostor') {
                     if (player.id != mySessionId)
                         continue;
@@ -421,7 +421,7 @@ function setup() {
 						if(player.me != player) {
 							player.sprite.zIndex=5;
 							player.tag.zIndex=5;
-						}	
+						}
                         player.sprite.rotation = 0;
 					}
                 } else {
@@ -504,15 +504,15 @@ function setup() {
 				alert(e);
 			}
         }
-		
+
 
 		function movePlayers(jump) {
 			var flagCanKill = false;
 			var flagCanReport = false;
 
-            for (const id in players) {
+            for (const id in g_players) {
                 if (id != mySessionId) {
-                    var p = players[id];
+                    var p = g_players[id];
 					if (me.impostor) {
 						if(canKill(p)) {
 							if(g_game == "chase") {
@@ -521,11 +521,11 @@ function setup() {
 							} else {
 								flagCanKill = true;
 							}
-						} 
+						}
 					} else {
 						if(g_game == "amongus" && canReport(p)) {
 							flagCanReport = true;
-						}							
+						}
 					}
 					if(jump) {
 						p.sprite.x = lerp(p.sprite.x, p.x - offset.x + tilingSprite.x, 1);
@@ -559,7 +559,7 @@ function setup() {
 				me.sprite.scale.x = -Math.abs(me.sprite.scale.x);
 			} else if(me.s.x<0) {
 				me.sprite.scale.x = Math.abs(me.sprite.scale.x);
-			} 
+			}
 			me.sprite.skew.x = -me.s.x/30;
 			var flagJump = false;
             var newx = me.lx - offset.x + tilingSprite.x;
@@ -623,12 +623,59 @@ function setup() {
         }
     });
 }
+function prepareMeeting() {
+    var div = Q("#meeting");
+    show(div);
+    var html = "";
+    html+= "<ul>"
+    for (const id in g_players) {
+        var p = g_players[id];
+        if (id != mySessionId) {
+            var p = g_players[id];
+            if(!p.alive) {
+                p.reported = true;
+                p.sprite.zIndex = -1;
+                p.tag.zIndex = -1;
+            }
+        }
+        html+="<li>"
+        html+="<span>"
+        html+='<img src="img/' + (p.color || "blue") + '-among-us.png" width="48" height="48" style="vertical-align: middle"/>'
+        html+='<span>'+p.name+' : </span>'
+        html+='<span id="votes_'+id+'"></span>'
+        if(p.alive && me.alive)
+            html+='<input id="vote_'+id+'" class="vote" type="submit" value="&#10004;" onClick="vote(event)" style="float: right;"/>'
+        html+="</span>"
+        html+="</li>"
+    }
+    html+= "</ul>"
+    html+= '<div id="chat_output" />'
+    html+= '<div style="position: absolute; bottom: 15px; left:10px; right: 10px; display: table;">'
+    html+='<input id="skip" type="submit" value="&#10060;" onClick="vote(event)" style="display: table-cell"/>'
+    html+='<input id ="chat_input" type="text" style="width: 70%; display: table-cell">'
+    html+='<input id="send_chat" type="submit" value="&#10132;" onClick="sendChat(event)" style="display: table-cell"/>'
+    html+="</div>"
+    div.innerHTML = html;
+}
 
+function sendChat() {
+    var text = Q("#chat_input").value;
+    send('chat', text);
+}
 function vote(event) {
-	var voteButton = event.target;
-	var tmp = voteButton.id.split("_");
-	send("vote", tmp[1])
-	voteButton.disabled = true;
+    var voteButton = event.target;
+    if(voteButton.id == "skip") {
+        send("vote", '')
+    } else {
+        var tmp = voteButton.id.split("_");
+        send("vote", tmp[1])
+    }
+    var inputs = QA("#meeting input.vote");
+    [...inputs].forEach((input) => {
+        input.disabled = true;
+    });
+    hide(Q("#skip"))
+    voteButton.disabled = true;
 }
 
 var g_disconnected = false;
@@ -658,9 +705,9 @@ function canReport(p) {
 }
 
 function killPlayer() {
-    for (const id in players) {
+    for (const id in g_players) {
         if (id != mySessionId) {
-            var p = players[id];
+            var p = g_players[id];
             if (canKill(p)) {
                 send('killed', p.id)
 				g_next_kill_time = time() + KILL_TIMEOUT * 1000;
@@ -670,9 +717,9 @@ function killPlayer() {
 }
 
 function reportBody() {
-    for (const id in players) {
+    for (const id in g_players) {
         if (id != mySessionId) {
-            var p = players[id];
+            var p = g_players[id];
             if (canReport(p)) {
                 send('meeting', '')
             }
@@ -746,15 +793,27 @@ function updateTime2Kill() {
 			hide(Q("#time-to-kill"));
 		}
 	}
-	
+
+}
+
+function showPlayers() {
+    var info = Q("#players");
+    info.innerHTML = "";
+    for (const id in g_players) {
+        var p = g_players[id];
+        info.innerHTML += '<div style="color:' + p.color + '">' + p.name + '</div>';
+    }
+
 }
 function showMessage(msg, timeout) {
     var messageDiv = Q("#message");
     show(messageDiv);
-        messageDiv.innerHTML = msg;
-    setTimeout(() => {
-        hide(Q("#message"));
-    }, timeout);
+    messageDiv.innerHTML = msg;
+    if(timeout) {
+        setTimeout(() => {
+            hide(Q("#message"));
+        }, timeout);
+    }
 }
 function hide(el) {
 	el.style.display = "none";
