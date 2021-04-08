@@ -8,8 +8,10 @@ var corridorG = 2;
 var corridorB = 3;
 var PLAYER_SIZE = 48;
 var TEXT_COLOR = "black";
-var KILL_DISTANCE = 30;
-var TASKS
+var KILL_DISTANCE = 40;
+var USE_DISTANCE = 40;
+var MEETING_DISTANCE = 100;
+var TASKS;
 var g_players = {};
 var players_length;
 var mySessionId;
@@ -26,7 +28,7 @@ var style, styleImpostor;
 var g_game;
 var g_next_kill_time = 0;
 var g_time_to_kill_sec;
-var g_my_tasks = [];
+var g_my_items = [];
 var TASKS = [
   {x: 1633, y: 273, name: "Wires", type: "task"},
   {x: 2332, y: 300, name: "Download", type: "task"},
@@ -38,9 +40,9 @@ var TASKS = [
   {x: 3566, y: 1049, name: "Steering", type: "task"},
   {x: 2524, y: 931, name: "O2 filter", type: "task"}
 ]
-var SPECIAL_ITEMS = {
+var SPECIAL_ITEMS = [
     {x: 1987, y: 612, name: "Meeting", type: "meeting"}
-}
+]
 var ALL_ITEMS = TASKS.concat(SPECIAL_ITEMS);
 
 var nick = getCookie("nick") || "";
@@ -97,7 +99,8 @@ app.loader.add([
         "img/yellow-among-us.png",
         "img/white-among-us.png",
         "img/bckg.png",
-        "img/map.png"
+        "img/map.png",
+        "img/item.png"
     ])
 var trees = [];
 for(var i=0; i<50; i++) {
@@ -111,9 +114,9 @@ var g_total_resources = 64;
 app.loader.onProgress.add(() => {
     g_loaded++;
     if(g_loaded < g_total_resources)
-        showMessage("Loading... "+g_loaded+"/"+g_total_resources);
+        showMessage("Loading... "+g_loaded+"/"+g_total_resources, 0, "gray");
     else
-        showMessage("DONE", 1000);
+        showMessage("DONE", 500, "red");
 }); // called once per loaded/errored file
 
 app.stage.sortableChildren = true;
@@ -172,7 +175,11 @@ function setup() {
 
 		});
 		room.onMessage("meeting", () => {
-		    newx = Math.random() * 484 + 1734;
+            positionToLoby();
+			prepareMeeting();
+		})
+        function positionToLoby() {
+            newx = Math.random() * 484 + 1734;
 		    newy = Math.random() * 78 + 236;
 			var s = {x: newx - me.lx, y: newy - me.ly}
 			me.lx = me.x = newx;
@@ -183,9 +190,7 @@ function setup() {
 			});
 
 			moveMySprite(s);
-			prepareMeeting();
-		})
-
+        }
 		room.onMessage("vote", (vote) => {
 			var votesSpan = Q("#votes_"+vote.voted_id);
 			var p = g_players[vote.id];
@@ -199,38 +204,41 @@ function setup() {
 		})
 
 		room.onMessage("IMPOSTOR WON", () => {
-		    showMessage("IMPOSTOR WON!", 5000)
+		    showMessage("IMPOSTOR WON!", 5000, "red")
 		    console.log("IMPOSTOR WON");
 		})
 		room.onMessage("IMPOSTOR FAILED", () => {
-		    showMessage("CREWMATE WIN!!!", 5000)
+		    showMessage("CREWMATE WIN!!!", 5000, "gold")
 		    console.log("IMPOSTOR FAILED");
 		})
 		room.onMessage("IMPOSTOR LEFT", () => {
-		    showMessage("IMPOSTOR LEFT!<br>CREWMATE WIN!!!", 5000)
+		    showMessage("IMPOSTOR LEFT!<br>CREWMATE WIN!!!", 5000, "gold")
 		    console.log("IMPOSTOR LEFT");
 		})
 		room.onMessage("TASKS COMPLETED", () => {
-		    showMessage("TASKS COMPLETED!<br>CREWMATE WIN!!!", 5000)
+		    showMessage("TASKS COMPLETED!<br>CREWMATE WIN!!!", 5000, "gold")
 		    console.log("TASKS COMPLETED");
 		})
 		room.onMessage("TIE", () => {
-		    showMessage("TIE!", 2000)
+		    showMessage("TIE!", 2000, "gray")
 		    console.log("TIE");
 			hide(Q("#meeting"));
 		})
 		room.onMessage("IMPOSTOR VOTED", (id) => {
 			var p = g_players[id];
-		    showMessage(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!", 5000)
+		    showMessage(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!", 5000, "gold")
 		    console.log(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!");
 			hide(Q("#meeting"));
 		})
 		room.onMessage("CREWMATE VOTED", (id) => {
 			var p = g_players[id];
             p.reported = true;
-            p.sprite.zIndex = -1;
-		    showMessage(p.name + " WAS NOT IMPOSTOR!<br>:-(", 5000)
-		    console.log(p.name + " WAS NOT IMPOSTOR!<br>:-(");
+            if(p!=me) {
+                p.sprite.visible = false;
+                p.tag.visible = false;
+            }
+		    showMessage(p.name + " WAS NOT THE IMPOSTOR!<br>:-(", 5000, "brown")
+		    console.log(p.name + " WAS NOT THE IMPOSTOR!<br>:-(");
 			hide(Q("#meeting"));
 		})
 
@@ -274,17 +282,21 @@ function setup() {
                 if (changes[i].field == "started") {
                     if (changes[i].value == true) {
                         console.log("GAME STARTED");
-                        hide(Q("#message"));
                         hide(Q("#startGame"));
-                        if (g_game == "amongus" && me.impostor) {
-                            g_next_kill_time = time() + KILL_TIMEOUT * 1000;
-                            show(Q("#time-to-kill"))
-                            showMessage("IMPOSTOR", 2000)
+                        if(me) {
+                            positionToLoby();
+                            if(me.impostor) {
+                                showMessage("YOU ARE <br>THE IMPOSTOR!", 2000, "red")
+                                if (g_game == "amongus") {
+                                    g_next_kill_time = time() + KILL_TIMEOUT * 1000;
+                                    show(Q("#time-to-kill"))
+                                }
+                            } else {
+                                showMessage("YOU ARE<br>CREWMATE", 2000, "brown")
+                            }
+                        } else {
+                            showMessage("GAME ALREADY STARTED<br>YOU CAN WATCH", 0, "gray")
                         }
-                        if(me.impostor)
-                            showMessage("IMPOSTOR", 2000)
-                        else
-                            showMessage("CREWMATE", 2000)
 
                     } else {
                         show(Q("#startGame"));
@@ -323,7 +335,17 @@ function setup() {
             var name = new PIXI.Text(nick || player.name || player.id, style);
             player.tag = name;
             player.tag.zIndex = 5;
+            if(state.started) {
+                player.sprite.visible = false;
+                player.tag.visible = false;
+            }
+
             if (player.id == mySessionId) {
+                if(state.started) {
+                    showMessage("GAME ALREADY STARTED<br>YOU CAN WATCH", 0, "gray")
+                }
+                player.sprite.visible = true;
+                player.tag.visible = true;
                 me = player;
                 me.s = new Victor(0, 0);
                 sprite.x = app.screen.width / 2;
@@ -345,11 +367,10 @@ function setup() {
                         p.tag.y = p.sprite.y - p.sprite.height;
                     }
                 }
-				if (state.game == "chase") {
-				}
-				if (state.game == "amongus")
+				if (state.game == "amongus") {
 					var bckg = "img/map.png";
-				else {
+                    prepareItemSprites();
+				} else {
 				    graphics = new PIXI.Graphics();
 				    graphics.zIndex = 0;
 				    graphics.lineStyle(10, 0x00ff00, 0.2);
@@ -402,6 +423,9 @@ function setup() {
                     player.name = changes[i].value;
 					player.tag.text = player.name;
                     showPlayers();
+                } else if (changes[i].field == 'tasks') {
+                    if(!state.started)
+                        prepareItems(changes[i].value);
                 } else if (changes[i].field == 'color') {
                     player.color = changes[i].value;
                     player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
@@ -419,8 +443,8 @@ function setup() {
                         player.sprite.rotation = Math.PI / 2;
 					} else {
 						if(player.me != player) {
-							player.sprite.zIndex=5;
-							player.tag.zIndex=5;
+							player.sprite.visible=true;
+							player.tag.visible=true;
 						}
                         player.sprite.rotation = 0;
 					}
@@ -544,14 +568,14 @@ function setup() {
                 }
             }
 			if(flagCanKill) {
-				show(Q("#killPlayer"));
+				show(g_killPlayerButton);
 			} else {
-				hide(Q("#killPlayer"));
+				hide(g_killPlayerButton);
 			}
 			if(flagCanReport) {
-				show(Q("#reportBody"));
+				show(g_reportBodyButton);
 			} else {
-				hide(Q("#reportBody"));
+				hide(g_reportBodyButton);
 			}
 		}
 		function moveMySprite(s) {
@@ -584,9 +608,32 @@ function setup() {
 		}
 
 		function checkActions(p) {
-			g_my_tasks.forEach((task) => {
+            var canUse = false;
+			g_my_items.forEach((task) => {
+                if(me.impostor) {
+                    if(task.type == "vent") {
 
+                    }
+                } else {
+                    var distance = USE_DISTANCE;
+                    if(task.type == "meeting") {
+                        distance = MEETING_DISTANCE;
+                    }
+                    if(!task.solved) {
+                        if(Math.abs(me.lx - task.x) < distance && Math.abs(me.ly - task.y) < distance) {
+                            g_useButton.dataset.index = task.index;
+                            task.sprite.visible = true;
+                            canUse=true;
+                        } else {
+                            task.sprite.visible = false;
+                        }
+                    }
+                }
 			});
+            if(canUse)
+                show(g_useButton);
+            else
+                hide(g_useButton);
 		}
 
         const rate = 4;
@@ -618,11 +665,120 @@ function setup() {
             setCookie("color", select.value);
 
             hide(Q("#form"));
-			if(!state.game.started)
+			if(!state.started)
 				show(Q("#startGame"));
         }
     });
 }
+var g_useButton = Q("#useItem");
+var g_killPlayerButton = Q("#killPlayer");
+var g_reportBodyButton = Q("#reportBody");
+
+var g_solving_task;
+function solveTask(task) {
+    g_solving_task = task;
+    var range = 100;
+    if(me.name.toUpperCase().match(/(EEP|IIP|ANI|SUNČICA)/))
+       range = 5;
+    solveMath(0, 3, range);
+}
+
+function solveMath(i, num, range) {
+    var taskDiv = Q("#task");
+    if(i == num) {
+        g_solving_task.solved = true;
+        g_solving_task.sprite.visible = false;
+        send("completed");
+        hide(taskDiv);
+        var thisTaskInfoDiv = Q('#task_'+g_solving_task.index);
+        thisTaskInfoDiv.style.color = "green";
+        return;
+    }
+    var html = '';
+    range = Number(range);
+    var a = Math.floor(Math.random()*range);
+    var b = Math.floor(Math.random()*range);
+    var choices = [];
+    var error=Math.pow(10, Math.floor(Math.log10(range))-1)
+    if(error<1)
+        error = 1;
+    choices.push(a+b-error);
+    choices.push(a+b+error);
+    choices.push(a+b);
+    shuffleArray(choices);
+    html+= '<div>'+(Number(i)+1)+' / '+num+' </div>'
+    html+= '<div>'+a+' + '+b+' = ?</div>'
+    html+= '<div>'
+    choices.forEach((choice, i) => {
+        html+='<label for="answerMath'+i+'" style="font-size: 30px; margin-top:-20px;margin-left:40px">'+choice+'</label>';
+        html+='<input type="radio" id="answerMath'+i+'" name="answerMath" value="'+choice+'">';
+        html+='<br>';
+    });
+    html+='<br>'
+    html+='<input type="button" data-i="'+i+'" data-num="'+num+'" data-range="'+range+'" data-answer="'+(a+b)+'" onclick="checkMath(event)" value="Submit">'
+    html+= '</div>'
+    html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
+    taskDiv.innerHTML = html;
+    show(taskDiv);
+}
+function hideTask() {
+    hide(Q("#task"))
+}
+
+function checkMath(event) {
+    var correctAnswer = event.target.dataset.answer;
+    var answer = Q('input[name="answerMath"]:checked').value;
+    var i = event.target.dataset.i;
+    var num = event.target.dataset.num;
+    var range = event.target.dataset.range;
+    if(correctAnswer == answer) {
+        solveMath(Number(i)+1, num, range*2)
+        showMessage("CORRECT!", 1000, "gold");
+    } else {
+        solveMath(i, num, range)
+        showMessage("INCORRECT!", 1000, "gold");
+    }
+
+}
+function prepareItemSprites() {
+    ALL_ITEMS.forEach((item, i) => {
+        const sprite = new PIXI.Sprite(app.loader.resources["img/item.png"].texture);
+        sprite.anchor.set(0.5);
+        sprite.x = item.x - offset.x;
+        sprite.y = item.y - offset.y;
+        sprite.width = sprite.height = 30;
+        sprite.visible = false;
+        container.addChild(sprite);
+        item.sprite = sprite;
+    });
+
+}
+function prepareItems(tasksString) {
+    var tasksDiv = Q('#tasks');
+    if(tasksString) {
+        var html = '';
+        var tasksIndexes = tasksString.split(",");
+        g_my_items = [];
+        tasksIndexes.forEach((index, i) => {
+            var task = TASKS[index];
+            task.index = i;
+            task.solved = false;
+            g_my_items.push(task);
+            html+='<div id="task_'+i+'" style="font-size: 18px">'+task.name+'</div>';
+        });
+        tasksDiv.innerHTML = html;
+        show(tasksDiv);
+    } else {
+        hide(tasksDiv);
+    }
+    var i = g_my_items.length;
+    SPECIAL_ITEMS.forEach((item) => {
+        item.index = i;
+        g_my_items.push(item);
+        i++;
+    });
+}
+
 function prepareMeeting() {
     var div = Q("#meeting");
     show(div);
@@ -634,8 +790,10 @@ function prepareMeeting() {
             var p = g_players[id];
             if(!p.alive) {
                 p.reported = true;
-                p.sprite.zIndex = -1;
-                p.tag.zIndex = -1;
+                if(p != me) {
+                    p.sprite.visible = false;
+                    p.tag.visible = false;
+                }
             }
         }
         html+="<li>"
@@ -644,7 +802,7 @@ function prepareMeeting() {
         html+='<span>'+p.name+' : </span>'
         html+='<span id="votes_'+id+'"></span>'
         if(p.alive && me.alive)
-            html+='<input id="vote_'+id+'" class="vote" type="submit" value="&#10004;" onClick="vote(event)" style="float: right;"/>'
+            html+='<input id="vote#'+id+'" class="vote" type="submit" value="&#10004;" onClick="vote(event)" style="float: right;"/>'
         html+="</span>"
         html+="</li>"
     }
@@ -667,7 +825,7 @@ function vote(event) {
     if(voteButton.id == "skip") {
         send("vote", '')
     } else {
-        var tmp = voteButton.id.split("_");
+        var tmp = voteButton.id.split("#");
         send("vote", tmp[1])
     }
     var inputs = QA("#meeting input.vote");
@@ -685,7 +843,7 @@ function send(type, data) {
 	} else {
 		if(g_disconnected != true) {
 			console.log("SERVER is disconnected!")
-			showMessage("SERVER is disconnected!<br>Try refreshing the browser.", 10000)
+			showMessage("SERVER is disconnected!<br>Try refreshing the browser.", 0, "red")
 			g_disconnected = true;
 		}
 	}
@@ -727,6 +885,19 @@ function reportBody() {
     }
 }
 
+function useItem(event) {
+    var useButton = event.target;
+    var item = g_my_items[useButton.dataset.index];
+    if(item.type == "meeting")
+        send("meeting");
+    else if(item.type == "task")
+        solveTask(item);
+    else if(item.type == "vent")
+        useVent(item);
+    else {
+        console.log("Unknown item type:", item.type);
+    }
+}
 
 var g_delta;
 function startGame() {
@@ -787,10 +958,12 @@ function updateTime2Kill() {
 		return;
 	var remaining = Math.floor((g_next_kill_time-time())/1000)
 	if(remaining != g_time_to_kill_sec) {
-		Q("#time-to-kill").innerHTML = remaining;
-		if(remaining == 0) {
+        var time_to_kill_button = Q("#time-to-kill");
+		time_to_kill_button.innerHTML = remaining;
+        show(time_to_kill_button);
+		if(remaining <= 0) {
 			g_next_kill_time = 0;
-			hide(Q("#time-to-kill"));
+			hide(time_to_kill_button);
 		}
 	}
 
@@ -801,21 +974,28 @@ function showPlayers() {
     info.innerHTML = "";
     for (const id in g_players) {
         var p = g_players[id];
-        info.innerHTML += '<div style="color:' + p.color + '">' + p.name + '</div>';
+        info.innerHTML += '<div style="font-size: 16px; color:' + p.color + '">' + p.name + '</div>';
     }
 
 }
-function showMessage(msg, timeout) {
+var g_showMessageTimeout;
+function showMessage(msg, timeout, color) {
+    if(g_showMessageTimeout)
+        clearTimeout(g_showMessageTimeout)
     var messageDiv = Q("#message");
     show(messageDiv);
     messageDiv.innerHTML = msg;
+    messageDiv.style.color = color || "blue";
     if(timeout) {
-        setTimeout(() => {
+        g_showMessageTimeout =  setTimeout(() => {
             hide(Q("#message"));
+            g_showMessageTimeout = null;
         }, timeout);
     }
 }
 function hide(el) {
+    if(el.target)
+        el = el.target;
 	el.style.display = "none";
 }
 function show(el) {
@@ -841,3 +1021,13 @@ function loadMap() {
     g_map = ctx;
 }
 setTimeout(loadMap, 5000);
+
+/* Randomize array in-place using Durstenfeld shuffle algorithm */
+function shuffleArray(array) {
+    for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+}

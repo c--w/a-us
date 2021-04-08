@@ -54,10 +54,10 @@ exports.AmongUsChase = class extends colyseus.Room {
             this.alivePlayers--;
             console.log("Player killed: " + player.name, this.alivePlayers);
         });
-        this.onMessage("completed", (client, completed) => {
+        this.onMessage("completed", (client, ignore) => {
             var player = this.state.players.get(client.sessionId);
-            player.completed = completed;
-            console.log("Player ", player.name, " completed ", this.completed);
+            player.completed++;
+            console.log("Player ", player.name, " completed another task");
         });
         this.onMessage("meeting", (client, ignore) => {
             var playerCalledMeeting = this.state.players.get(client.sessionId);
@@ -175,6 +175,9 @@ exports.AmongUsChase = class extends colyseus.Room {
 	        } else {
 	            player.impostor = false;
 	            player.completed = 0;
+                player.tasks = this.generateTasks(this.TASKS, this.TOTAL_TASKS);
+                player.completed = 0;
+
 	        }
 	        i++;
 	    });
@@ -254,10 +257,7 @@ exports.AmongUsChase = class extends colyseus.Room {
 			this.alivePlayers++;
 		}
         player.impostor = false;
-        if(this.game == "amongus") {
-            player.tasks = generateTasks(this.TASKS, this.TOTAL_TASKS);
-            player.completed = 0;
-        } else {
+        if(this.game == "chase") {
 			if(this.state.started) {
 				setTimeout(() => {
 					client.send("obstacles", this.obstacles);
@@ -295,7 +295,7 @@ exports.AmongUsChase = class extends colyseus.Room {
             var n;
             do {
                 n = Math.floor(Math.random()*total);
-            } while(a.contains(n))
+            } while(a.includes(n))
             a.push(n);
         }
         return a.join(",");
