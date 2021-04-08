@@ -17,6 +17,7 @@ var g_players = {};
 var players_length;
 var mySessionId;
 var me;
+var g_impostor;
 var offset;
 var state;
 var tilingSprite;
@@ -28,6 +29,7 @@ var g_obstacles;
 var style, styleImpostor;
 var g_game;
 var g_next_kill_time = 0;
+var g_next_meeting_time = 0;
 var g_time_to_kill_sec;
 var g_my_items = [];
 var TASKS = [
@@ -257,31 +259,31 @@ function setup() {
 		})
 
 		room.onMessage("IMPOSTOR WON", () => {
-		    showMessage("IMPOSTOR WON!", 5000, "red")
+		    showMessage("IMPOSTOR "+g_impostor.name+" WON!", 5000, "red")
 		    console.log("IMPOSTOR WON");
 		})
 		room.onMessage("IMPOSTOR FAILED", () => {
-		    showMessage("CREWMATE WIN!!!", 5000, "gold")
+		    showMessage("CREWMATE WIN!!!<br>IMPOSTOR: "+g_impostor.name, 5000, "gold")
 		    console.log("IMPOSTOR FAILED");
 		})
 		room.onMessage("IMPOSTOR LEFT", () => {
-		    showMessage("IMPOSTOR LEFT!<br>CREWMATE WIN!!!", 5000, "gold")
+		    showMessage("CREWMATE WIN!!!<br>IMPOSTOR "+g_impostor.name+" LEFT!", 5000, "gold")
 		    console.log("IMPOSTOR LEFT");
 		})
 		room.onMessage("TASKS COMPLETED", () => {
-		    showMessage("TASKS COMPLETED!<br>CREWMATE WIN!!!", 5000, "gold")
+		    showMessage("CREWMATE WIN!!!<br>TASKS COMPLETED!<br>IMPOSTOR: "+g_impostor.name, 5000, "gold")
 		    console.log("TASKS COMPLETED");
 		})
 		room.onMessage("TIE", () => {
 		    showMessage("TIE!", 2000, "gray")
 		    console.log("TIE");
-			hide(Q("#meeting"));
+            endMeeting();
 		})
 		room.onMessage("IMPOSTOR VOTED", (id) => {
 			var p = g_players[id];
 		    showMessage(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!", 5000, "gold")
 		    console.log(p.name + " WAS THE IMPOSTOR!<br>CREWMATE WIN!!!");
-			hide(Q("#meeting"));
+            endMeeting();
 		})
 		room.onMessage("CREWMATE VOTED", (id) => {
 			var p = g_players[id];
@@ -292,7 +294,7 @@ function setup() {
             }
 		    showMessage(p.name + " WAS NOT THE IMPOSTOR!<br>:-(", 5000, "brown")
 		    console.log(p.name + " WAS NOT THE IMPOSTOR!<br>:-(");
-			hide(Q("#meeting"));
+            endMeeting();
 		})
 
 		room.state.players.onAdd = addPlayer;
@@ -336,12 +338,14 @@ function setup() {
                     if (changes[i].value == true) {
                         console.log("GAME STARTED");
                         hide(Q("#startGame"));
+                        hideTask();
                         if(me) {
                             positionToLoby();
                             if(me.impostor) {
                                 showMessage("YOU ARE <br>THE IMPOSTOR!", 2000, "red")
                                 if (g_game == "amongus") {
                                     g_next_kill_time = time() + KILL_TIMEOUT * 1000;
+                                    g_next_meeting_time = time() + KILL_TIMEOUT * 1000;
                                     show(Q("#time-to-kill"))
                                     prepareItems();
                                 }
@@ -349,14 +353,18 @@ function setup() {
                                 showMessage("YOU ARE<br>CREWMATE", 2000, "brown")
                                 if (g_game == "amongus") {
                                     prepareItems(me.tasks);
+                                    hide(Q("#time-to-kill"))
                                 }
                             }
                         } else {
                             showMessage("GAME ALREADY STARTED<br>YOU CAN WATCH", 0, "gray")
+                            hide(Q("#time-to-kill"));
+                            hideTask();
                         }
 
                     } else {
                         show(Q("#startGame"));
+                        Q('#tasks').innerHTML = "";
                     }
                 } else if (changes[i].field == "elapsed") {
                     var timeDiv = Q("#time");
@@ -486,8 +494,10 @@ function setup() {
                     player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
                     showPlayers();
                 } else if (changes[i].field == 'impostor') {
-                    if (player.id != mySessionId)
+                    if (player.id != mySessionId) {
+                        g_impostor = player;
                         continue;
+                    }
                     player.impostor = changes[i].value;
                     if (player.impostor)
                         player.tag.style = styleImpostor;
@@ -495,6 +505,8 @@ function setup() {
                         player.tag.style = style;
                 } else if (changes[i].field == 'alive') {
                     if (!player.alive) {
+                        if(player == me)
+                            hideTask();
                         player.sprite.rotation = Math.PI / 2;
 					} else {
 						if(player.me != player) {
@@ -638,7 +650,7 @@ function setup() {
 			g_my_items.forEach((task) => {
                 var distance = USE_DISTANCE;
                 if(me.impostor) {
-                    if(task.type == "vent") {
+                    if(task.type == "vent" || task.type == "meeting") {
                         if(Math.abs(me.lx - task.x) < distance && Math.abs(me.ly - task.y) < distance) {
                             g_useButton.dataset.index = task.index;
                             task.sprite.visible = true;
@@ -706,7 +718,15 @@ function setup() {
         }
     });
 }
+function endMeeting() {
+    hide(Q("#meeting"));
+    if(me.impostor) {
+        g_next_kill_time = time() + KILL_TIMEOUT * 1000;
+    } else {
+        g_next_meeting_time = time() + KILL_TIMEOUT * 1000;
+    }
 
+}
 function moveMySprite(s) {
     if(me.s.x>0) {
         me.sprite.scale.x = -Math.abs(me.sprite.scale.x);
@@ -751,15 +771,27 @@ function prepareItemSprites() {
         container.addChild(sprite);
         item.sprite = sprite;
     });
+}
+function initItemSprites() {
+    ALL_ITEMS.forEach((item, i) => {
+        item.sprite.visible = false;
+    });
 
 }
 function prepareItems(tasksString) {
+    initItemSprites();
     var tasksDiv = Q('#tasks');
     g_my_items = [];
     if(me.impostor) {
         SPECIAL_ITEMS_IMPOSTOR.forEach((task, i) => {
             task.index = i;
             g_my_items.push(task);
+        });
+        var i = g_my_items.length;
+        SPECIAL_ITEMS_CREW.forEach((item) => {
+            item.index = i;
+            g_my_items.push(item);
+            i++;
         });
         hide(tasksDiv);
     } else {
@@ -823,7 +855,11 @@ function prepareMeeting() {
 
 function sendChat() {
     var text = Q("#chat_input").value;
-    send('chat', text);
+    if(!me.impostor) {
+        send('chat', text);
+    } else {
+        chat_output.innerHTML = '<div style="color: gray;">'+p.name+': '+msgObj.msg+'</div>' + chat_output.innerHTML;
+    }
 }
 function vote(event) {
     var voteButton = event.target;
@@ -906,9 +942,13 @@ function useVent(item) {
 function useItem(event) {
     var useButton = event.target;
     var item = g_my_items[useButton.dataset.index];
-    if(item.type == "meeting")
-        send("meeting");
-    else if(item.type == "task")
+    if(item.type == "meeting") {
+        var remaining = Math.floor((g_next_meeting_time-time())/1000)
+        if(remaining < 0)
+            send("meeting");
+        else
+            showMessage("TRY AFTER "+remaining+" seconds");
+    } else if(item.type == "task")
         solveTask(item);
     else if(item.type == "vent")
         useVent(item);
