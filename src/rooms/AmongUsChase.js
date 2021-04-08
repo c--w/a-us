@@ -16,7 +16,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         } else {
             state.world_size_x = 3660;
             state.world_size_y = 2198;
-            this.ALIVE_IMPOSTOR_WIN = 1;
+            this.ALIVE_IMPOSTOR_WIN = 2;
             this.TOTAL_TASKS = 44;
             this.TASKS = 4;
         }
@@ -190,15 +190,14 @@ exports.AmongUsChase = class extends colyseus.Room {
 	    });
 	    self.state.elapsed = 0;
 	}
-	update(deltaTime) {
+    update(deltaTime) {
         if(this.impostorPlayer && this.state.started) {
             if(this.alivePlayers <= this.ALIVE_IMPOSTOR_WIN) {
                 console.log("Impostor won");
-				this.broadcast("IMPOSTOR WON", "")
-			    this.state.started = false;
-				setTimeout(this.revivePlayers, 2000, this)
-				}
-				else if (this.state.game == "chase") {
+                this.broadcast("IMPOSTOR WON", "")
+                this.state.started = false;
+                setTimeout(this.revivePlayers, 2000, this)
+            } else if (this.state.game == "chase") {
                 this.checkTime();
             } else {
                 this.checkTasksCompleted()
@@ -214,7 +213,7 @@ exports.AmongUsChase = class extends colyseus.Room {
         this.state.players.forEach((player) => {
             sum+=player.completed;
         });
-        if(sum >= this.state.players.size * this.TASKS) {
+        if(sum >= (this.state.players.size-1) * this.TASKS) {
             this.state.started = false;
 			this.broadcast("TASKS COMPLETED", "")
             console.log("Tasks completed");

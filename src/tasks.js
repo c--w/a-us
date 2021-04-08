@@ -1,3 +1,9 @@
+var WORDS = {
+    3: ["TOP", "SOL", "KIP", "PAS", "ZUB", "ZEC", "MIŠ", "BIK", "PUŽ", "JEŽ", "ŠAL", "OKO", "DAN", "NOĆ", "GOL", "KIT", "SAT", "KAT", "MED", "LED", "BOG", "CRV"],
+    4: ["BRAT", "TETA", "DJED", "BOCA", "BOJA", "BROD", "BROJ", "BUKA", "CRTA", "ČUDO", "ČVOR", "ČAŠA", "TVOR"],
+    5: ["AVION", "KOCKA", "BALON", "BISER", "BLATO", "BORAC", "BRIGA", "ČIČAK"]
+}
+
 var g_solving_task;
 function solveTask(task) {
     var ani = me.name.toUpperCase().match(/(EEP|IIP|ANI|SUNČICA)/);
@@ -15,12 +21,12 @@ function solveTask(task) {
         }
         solveMath(0, num, range);
     } else if (a == 1) {
-        var range = 4;
+        var range = 3;
         if(ani)
-            range = 3;
+            range = 2;
         solveOrder(0, 3, range);
     } else if (a == 2) {
-        var range = 3
+        var range = 3;
         solveAnagram(0, 3, range);
     }
 }

@@ -2,7 +2,7 @@ var Q = document.querySelector.bind(document);
 var QA = document.querySelectorAll.bind(document)
 var INPUT_RESPONSE_RATE = 1;
 var NON_SCROLLING_RATIO = 0.3;
-var KILL_TIMEOUT=20;
+var KILL_TIMEOUT=30;
 var corridorR = 1;
 var corridorG = 2;
 var corridorB = 3;
@@ -29,11 +29,6 @@ var style, styleImpostor;
 var g_game;
 var g_next_kill_time = 0;
 var g_time_to_kill_sec;
-var WORDS = {
-    3: ["TOP", "SOL", "KIP", "PAS", "ZUB", "ZEC", "MIŠ", "BIK", "PUŽ", "JEŽ", "ŠAL", "OKO", "DAN", "NOĆ", "GOL", "KIT", "SAT", "KAT", "MED", "LED", "BOG", "CRV"],
-    4: ["KAVA", "MAMA", "TATA", "BRAT", "TETA", "BAKA", "DJED", "MACA", "BOCA", "BOJA", "BROD", "BROJ", "BUKA", "CRTA", "ČUDO", "ČVOR", "ČAŠA", "TVOR"],
-    5: ["AVION", "KOCKA", "BAJKA", "BALON", "BANKA", "BISER", "BLATO", "BORAC", "BRIGA", "ČIČAK"]
-}
 var g_my_items = [];
 var TASKS = [
     {x: 521, y: 726, name: "Align (UPPER ENGINE)", type: "task"},
@@ -125,7 +120,9 @@ function isTouchDevice() {
 }
 
 if (isTouchDevice()) {
-	show(Q("#joyDiv"))
+    var div = Q("#joyDiv");
+	show(div);
+    div.style.left=window.innerWidth/2-60;
     var joy = new JoyStick('joyDiv');
 } else {
     window.addEventListener('mousemove', e => {
