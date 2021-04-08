@@ -17,7 +17,7 @@ exports.AmongUsChase = class extends colyseus.Room {
             state.world_size_x = 3660;
             state.world_size_y = 2198;
             this.ALIVE_IMPOSTOR_WIN = 1;
-            this.TOTAL_TASKS = 9;
+            this.TOTAL_TASKS = 44;
             this.TASKS = 4;
         }
         this.setState(state);
@@ -69,7 +69,6 @@ exports.AmongUsChase = class extends colyseus.Room {
             var playerChatting = this.state.players.get(client.sessionId);
             this.broadcast("chat", {id: client.sessionId, msg: msg})
 			console.log("Player ", playerChatting.name, "sent message", msg);
-			this.votes = 0;
 		});
         this.onMessage("vote", (client, voted_id) => {
             var voting_player = this.state.players.get(client.sessionId);

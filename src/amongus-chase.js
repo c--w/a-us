@@ -9,9 +9,10 @@ var corridorB = 3;
 var PLAYER_SIZE = 48;
 var TEXT_COLOR = "black";
 var KILL_DISTANCE = 40;
-var USE_DISTANCE = 40;
-var MEETING_DISTANCE = 100;
-var TASKS;
+var USE_DISTANCE = 50;
+var VIEW_TASK_DISTANCE = 200;
+var MEETING_DISTANCE = 120;
+var USE_SPRITE_SIZE = 40;
 var g_players = {};
 var players_length;
 var mySessionId;
@@ -28,22 +29,77 @@ var style, styleImpostor;
 var g_game;
 var g_next_kill_time = 0;
 var g_time_to_kill_sec;
+var WORDS = {
+    3: ["TOP", "SOL", "KIP", "PAS", "ZUB", "ZEC", "MIŠ", "BIK", "PUŽ", "JEŽ", "ŠAL", "OKO", "DAN", "NOĆ", "GOL", "KIT", "SAT", "KAT", "MED", "LED", "BOG", "CRV"],
+    4: ["KAVA", "MAMA", "TATA", "BRAT", "TETA", "BAKA", "DJED", "MACA", "BOCA", "BOJA", "BROD", "BROJ", "BUKA", "CRTA", "ČUDO", "ČVOR", "ČAŠA", "TVOR"],
+    5: ["AVION", "KOCKA", "BAJKA", "BALON", "BANKA", "BISER", "BLATO", "BORAC", "BRIGA", "ČIČAK"]
+}
 var g_my_items = [];
 var TASKS = [
-  {x: 1633, y: 273, name: "Wires", type: "task"},
-  {x: 2332, y: 300, name: "Download", type: "task"},
-  {x: 811, y: 1061, name: "Wires", type: "task"},
-  {x: 2413, y: 381, name: "Garbage", type: "task"},
-  {x: 1585, y: 1293, name: "Distributor", type: "task"},
-  {x: 1335, y: 1276, name: "Power", type: "task"},
-  {x: 2914, y: 1501, name: "Accept Power", type: "task"},
-  {x: 3566, y: 1049, name: "Steering", type: "task"},
-  {x: 2524, y: 931, name: "O2 filter", type: "task"}
+    {x: 521, y: 726, name: "Align (UPPER ENGINE)", type: "task"},
+    {x: 590, y: 720, name: "Fuel (UPPER ENGINE)", type: "task"},
+    {x: 678, y: 442, name: "Power (UPPER ENGINE)", type: "task"},
+    {x: 1633, y: 275, name: "Wires (CAFFE)", type: "task"},
+    {x: 2332, y: 300, name: "Data (CAFFE)", type: "task"},
+    {x: 2413, y: 381, name: "Garbage (CAFFE)", type: "task"},
+    {x: 2800, y: 556, name: "Asteroids (WEAPONS)", type: "task", visual: true},
+    {x: 2970, y: 526, name: "Power (WEAPONS)", type: "task"},
+    {x: 2927, y: 890, name: "Power (O2)", type: "task"},
+    {x: 2594, y: 920, name: "Depletion (O2)", type: "task"},
+    {x: 2524, y: 931, name: "Filter (O2)", type: "task"},
+    {x: 2450, y: 956, name: "Chute (O2)", type: "task"},
+    {x: 3219, y: 993, name: "Wiring (NAV)", type: "task"},
+    {x: 3338, y: 886, name: "Power (NAV)", type: "task"},
+    {x: 3417, y: 886, name: "Data (NAV)", type: "task"},
+    {x: 3498, y: 950, name: "Course (NAV)", type: "task"},
+    {x: 3558, y: 1062, name: "Steer (NAV)", type: "task"},
+    {x: 2914, y: 1501, name: "Power (SHIELDS)", type: "task"},
+    {x: 2662, y: 1828, name: "Prime (SHIELDS)", type: "task"},
+    {x: 2557, y: 1194, name: "Data (ADMIN)", type: "task"},
+    {x: 2572, y: 1207, name: "Depletion (ADMIN)", type: "task"},
+    {x: 2504, y: 1384, name: "Card (ADMIN)", type: "task"},
+    {x: 2548, y: 1818, name: "Power (COMMS)", type: "task"},
+    {x: 2367, y: 1807, name: "Data (COMMS)", type: "task"},
+    {x: 2388, y: 2035, name: "Comms (COMMS)", type: "task"},
+    {x: 2123, y: 2035, name: "Garbage (STORAGE)", type: "task"},
+    {x: 1901, y: 1390, name: "Wiring (STORAGE)", type: "task"},
+    {x: 1829, y: 1805, name: "Fuel (STORAGE)", type: "task"},
+    {x: 1273, y: 1485, name: "Lights (ELECTRICAL)", type: "task"},
+    {x: 1335, y: 1275, name: "Power (ELECTRICAL)", type: "task"},
+    {x: 1437, y: 1305, name: "Wires (ELECTRICAL)", type: "task"},
+    {x: 1585, y: 1293, name: "Calibrate (ELECTRICAL)", type: "task"},
+    {x: 1567, y: 1026, name: "Sample (MEDBAY)", type: "task"},
+    {x: 1475, y: 1109, name: "Scan (MEDBAY)", type: "task"},
+    {x: 811, y: 1061, name: "Wires (SECURITY)", type: "task"},
+    {x: 1010, y: 891, name: "Cameras (SECURITY)", type: "task"},
+    {x: 616, y: 1430, name: "Power (L ENGINE)", type: "task"},
+    {x: 522, y: 1701, name: "Align (L ENGINE)", type: "task"},
+    {x: 596, y: 1695, name: "Fuel (L ENGINE)", type: "task"},
+    {x: 355, y: 800, name: "Meltdown (REACTOR)", type: "task"},
+    {x: 355, y: 1407, name: "Meltdown (REACTOR)", type: "task"},
+    {x: 457, y: 945, name: "Power (REACTOR)", type: "task"},
+    {x: 256, y: 894, name: "Unlock (REACTOR)", type: "task"},
+    {x: 314, y: 1138, name: "Start (REACTOR)", type: "task"},
 ]
-var SPECIAL_ITEMS = [
+var SPECIAL_ITEMS_CREW = [
     {x: 1987, y: 612, name: "Meeting", type: "meeting"}
 ]
-var ALL_ITEMS = TASKS.concat(SPECIAL_ITEMS);
+var SPECIAL_ITEMS_IMPOSTOR = [
+    {x: 834, y: 496, name: "Vent", type: "vent", tx: 308, ty: 940},
+    {tx: 834, ty: 496, name: "Vent", type: "vent", x: 308, y: 940},
+    {x: 2760, y: 430, name: "Vent", type: "vent", tx: 3338, ty: 948},
+    {tx: 2760, ty: 430, name: "Vent", type: "vent", x: 3338, y: 948},
+    {x: 3338, y: 1206, name: "Vent", type: "vent", tx: 2818, ty: 1842},
+    {tx: 3338, ty: 1206, name: "Vent", type: "vent", x: 2818, y: 1842},
+    {x: 2398, y: 720, name: "Vent", type: "vent", tx: 2808, ty: 1210},
+    {tx: 2259, ty: 1495, name: "Vent", type: "vent", x: 2808, y: 1210},
+    {x: 2259, y: 1495, name: "Vent", type: "vent", tx: 2398, ty: 720},
+    {x: 1274, y: 1338, name: "Vent", type: "vent", tx: 1207, ty: 1032},
+    {tx: 1053, ty: 1253, name: "Vent", type: "vent", x: 1207, y: 1032},
+    {x: 1053, y: 1253, name: "Vent", type: "vent", tx: 1274, ty: 1338},
+    {x: 392, y: 1252, name: "Vent", type: "vent", tx: 837, ty: 1787},
+]
+var ALL_ITEMS = TASKS.concat(SPECIAL_ITEMS_CREW).concat(SPECIAL_ITEMS_IMPOSTOR);
 
 var nick = getCookie("nick") || "";
 
@@ -290,9 +346,13 @@ function setup() {
                                 if (g_game == "amongus") {
                                     g_next_kill_time = time() + KILL_TIMEOUT * 1000;
                                     show(Q("#time-to-kill"))
+                                    prepareItems();
                                 }
                             } else {
                                 showMessage("YOU ARE<br>CREWMATE", 2000, "brown")
+                                if (g_game == "amongus") {
+                                    prepareItems(me.tasks);
+                                }
                             }
                         } else {
                             showMessage("GAME ALREADY STARTED<br>YOU CAN WATCH", 0, "gray")
@@ -424,8 +484,6 @@ function setup() {
 					player.tag.text = player.name;
                     showPlayers();
                 } else if (changes[i].field == 'tasks') {
-                    if(!state.started)
-                        prepareItems(changes[i].value);
                 } else if (changes[i].field == 'color') {
                     player.color = changes[i].value;
                     player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
@@ -529,7 +587,6 @@ function setup() {
 			}
         }
 
-
 		function movePlayers(jump) {
 			var flagCanKill = false;
 			var flagCanReport = false;
@@ -578,52 +635,34 @@ function setup() {
 				hide(g_reportBodyButton);
 			}
 		}
-		function moveMySprite(s) {
-			if(me.s.x>0) {
-				me.sprite.scale.x = -Math.abs(me.sprite.scale.x);
-			} else if(me.s.x<0) {
-				me.sprite.scale.x = Math.abs(me.sprite.scale.x);
-			}
-			me.sprite.skew.x = -me.s.x/30;
-			var flagJump = false;
-            var newx = me.lx - offset.x + tilingSprite.x;
-            var newy = me.ly - offset.y + tilingSprite.y;
-            if (newx > app.screen.width * NON_SCROLLING_RATIO && newx < app.screen.width * (1-NON_SCROLLING_RATIO)) {
-                me.sprite.x = newx;
-                me.tag.x = me.sprite.x;
-            } else {
-                tilingSprite.x -= s.x;
-                container.position.x -= s.x;
-				flagJump = true;
-            }
-            if (newy > app.screen.height * NON_SCROLLING_RATIO && newy < app.screen.height * (1-NON_SCROLLING_RATIO)) {
-                me.sprite.y = newy;
-                me.tag.y = me.sprite.y - me.sprite.height;
-            } else {
-                tilingSprite.y -= s.y;
-                container.position.y -= s.y
-				flagJump = true;
-            }
-			return flagJump;
-		}
 
 		function checkActions(p) {
             var canUse = false;
 			g_my_items.forEach((task) => {
+                var distance = USE_DISTANCE;
                 if(me.impostor) {
                     if(task.type == "vent") {
-
-                    }
-                } else {
-                    var distance = USE_DISTANCE;
-                    if(task.type == "meeting") {
-                        distance = MEETING_DISTANCE;
-                    }
-                    if(!task.solved) {
                         if(Math.abs(me.lx - task.x) < distance && Math.abs(me.ly - task.y) < distance) {
                             g_useButton.dataset.index = task.index;
                             task.sprite.visible = true;
                             canUse=true;
+                        } else {
+                            task.sprite.visible = false;
+                        }
+                    }
+                } else {
+                    if(task.type == "meeting") {
+                        distance = MEETING_DISTANCE;
+                    }
+                    if(!task.solved && !(task.type == "meeting" && !me.alive)) {
+                        if(Math.abs(me.lx - task.x) < distance && Math.abs(me.ly - task.y) < distance) {
+                            g_useButton.dataset.index = task.index;
+                            task.sprite.width = task.sprite.height = USE_SPRITE_SIZE;
+                            task.sprite.visible = true;
+                            canUse=true;
+                        } else if(Math.abs(me.lx - task.x) < VIEW_TASK_DISTANCE && Math.abs(me.ly - task.y) < VIEW_TASK_DISTANCE) {
+                            task.sprite.width = task.sprite.height = USE_SPRITE_SIZE/2;
+                            task.sprite.visible = true;
                         } else {
                             task.sprite.visible = false;
                         }
@@ -670,83 +709,47 @@ function setup() {
         }
     });
 }
+
+function moveMySprite(s) {
+    if(me.s.x>0) {
+        me.sprite.scale.x = -Math.abs(me.sprite.scale.x);
+    } else if(me.s.x<0) {
+        me.sprite.scale.x = Math.abs(me.sprite.scale.x);
+    }
+    me.sprite.skew.x = -me.s.x/30;
+    var flagJump = false;
+    var newx = me.lx - offset.x + tilingSprite.x;
+    var newy = me.ly - offset.y + tilingSprite.y;
+    if (newx > app.screen.width * NON_SCROLLING_RATIO && newx < app.screen.width * (1-NON_SCROLLING_RATIO)) {
+        me.sprite.x = newx;
+        me.tag.x = me.sprite.x;
+    } else {
+        tilingSprite.x -= s.x;
+        container.position.x -= s.x;
+        flagJump = true;
+    }
+    if (newy > app.screen.height * NON_SCROLLING_RATIO && newy < app.screen.height * (1-NON_SCROLLING_RATIO)) {
+        me.sprite.y = newy;
+        me.tag.y = me.sprite.y - me.sprite.height;
+    } else {
+        tilingSprite.y -= s.y;
+        container.position.y -= s.y
+        flagJump = true;
+    }
+    return flagJump;
+}
+
 var g_useButton = Q("#useItem");
 var g_killPlayerButton = Q("#killPlayer");
 var g_reportBodyButton = Q("#reportBody");
 
-var g_solving_task;
-function solveTask(task) {
-    g_solving_task = task;
-    var range = 100;
-    if(me.name.toUpperCase().match(/(EEP|IIP|ANI|SUNČICA)/))
-       range = 5;
-    solveMath(0, 3, range);
-}
-
-function solveMath(i, num, range) {
-    var taskDiv = Q("#task");
-    if(i == num) {
-        g_solving_task.solved = true;
-        g_solving_task.sprite.visible = false;
-        send("completed");
-        hide(taskDiv);
-        var thisTaskInfoDiv = Q('#task_'+g_solving_task.index);
-        thisTaskInfoDiv.style.color = "green";
-        return;
-    }
-    var html = '';
-    range = Number(range);
-    var a = Math.floor(Math.random()*range);
-    var b = Math.floor(Math.random()*range);
-    var choices = [];
-    var error=Math.pow(10, Math.floor(Math.log10(range))-1)
-    if(error<1)
-        error = 1;
-    choices.push(a+b-error);
-    choices.push(a+b+error);
-    choices.push(a+b);
-    shuffleArray(choices);
-    html+= '<div>'+(Number(i)+1)+' / '+num+' </div>'
-    html+= '<div>'+a+' + '+b+' = ?</div>'
-    html+= '<div>'
-    choices.forEach((choice, i) => {
-        html+='<label for="answerMath'+i+'" style="font-size: 30px; margin-top:-20px;margin-left:40px">'+choice+'</label>';
-        html+='<input type="radio" id="answerMath'+i+'" name="answerMath" value="'+choice+'">';
-        html+='<br>';
-    });
-    html+='<br>'
-    html+='<input type="button" data-i="'+i+'" data-num="'+num+'" data-range="'+range+'" data-answer="'+(a+b)+'" onclick="checkMath(event)" value="Submit">'
-    html+= '</div>'
-    html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
-    taskDiv.innerHTML = html;
-    show(taskDiv);
-}
-function hideTask() {
-    hide(Q("#task"))
-}
-
-function checkMath(event) {
-    var correctAnswer = event.target.dataset.answer;
-    var answer = Q('input[name="answerMath"]:checked').value;
-    var i = event.target.dataset.i;
-    var num = event.target.dataset.num;
-    var range = event.target.dataset.range;
-    if(correctAnswer == answer) {
-        solveMath(Number(i)+1, num, range*2)
-        showMessage("CORRECT!", 1000, "gold");
-    } else {
-        solveMath(i, num, range)
-        showMessage("INCORRECT!", 1000, "gold");
-    }
-
-}
 function prepareItemSprites() {
     ALL_ITEMS.forEach((item, i) => {
         const sprite = new PIXI.Sprite(app.loader.resources["img/item.png"].texture);
         sprite.anchor.set(0.5);
         sprite.x = item.x - offset.x;
         sprite.y = item.y - offset.y;
-        sprite.width = sprite.height = 30;
+        sprite.width = sprite.height = USE_SPRITE_SIZE;
         sprite.visible = false;
         container.addChild(sprite);
         item.sprite = sprite;
@@ -755,10 +758,16 @@ function prepareItemSprites() {
 }
 function prepareItems(tasksString) {
     var tasksDiv = Q('#tasks');
-    if(tasksString) {
+    g_my_items = [];
+    if(me.impostor) {
+        SPECIAL_ITEMS_IMPOSTOR.forEach((task, i) => {
+            task.index = i;
+            g_my_items.push(task);
+        });
+        hide(tasksDiv);
+    } else {
         var html = '';
         var tasksIndexes = tasksString.split(",");
-        g_my_items = [];
         tasksIndexes.forEach((index, i) => {
             var task = TASKS[index];
             task.index = i;
@@ -768,19 +777,18 @@ function prepareItems(tasksString) {
         });
         tasksDiv.innerHTML = html;
         show(tasksDiv);
-    } else {
-        hide(tasksDiv);
+        var i = g_my_items.length;
+        SPECIAL_ITEMS_CREW.forEach((item) => {
+            item.index = i;
+            g_my_items.push(item);
+            i++;
+        });
     }
-    var i = g_my_items.length;
-    SPECIAL_ITEMS.forEach((item) => {
-        item.index = i;
-        g_my_items.push(item);
-        i++;
-    });
 }
 
 function prepareMeeting() {
     var div = Q("#meeting");
+    hide(Q("#task"));
     show(div);
     var html = "";
     html+= "<ul>"
@@ -807,7 +815,7 @@ function prepareMeeting() {
         html+="</li>"
     }
     html+= "</ul>"
-    html+= '<div id="chat_output" />'
+    html+= '<div id="chat_output" style="font-size: 20px;"/>'
     html+= '<div style="position: absolute; bottom: 15px; left:10px; right: 10px; display: table;">'
     html+='<input id="skip" type="submit" value="&#10060;" onClick="vote(event)" style="display: table-cell"/>'
     html+='<input id ="chat_input" type="text" style="width: 70%; display: table-cell">'
@@ -824,16 +832,16 @@ function vote(event) {
     var voteButton = event.target;
     if(voteButton.id == "skip") {
         send("vote", '')
+        voteButton.disabled = true;
     } else {
         var tmp = voteButton.id.split("#");
         send("vote", tmp[1])
+        Q("#skip").disabled = true;
     }
     var inputs = QA("#meeting input.vote");
     [...inputs].forEach((input) => {
         input.disabled = true;
     });
-    hide(Q("#skip"))
-    voteButton.disabled = true;
 }
 
 var g_disconnected = false;
@@ -883,6 +891,19 @@ function reportBody() {
             }
         }
     }
+}
+
+function useVent(item) {
+    var newx = item.tx;
+    var newy = item.ty;
+    var s = {x: newx - me.lx, y: newy - me.ly}
+    me.lx = me.x = newx;
+    me.ly = me.y = newy;
+    send('pos', {
+        x: me.x,
+        y: me.y
+    });
+    moveMySprite(s);
 }
 
 function useItem(event) {
