@@ -159,7 +159,7 @@ app.loader.add([
     ])
 var trees = [];
 for(var i=0; i<50; i++) {
-    var num = ""+(i+1);
+    var num = String(i+1);
     trees.push("img/"+num.padStart(3, "0")+"-tree.png");
 }
 app.loader.add(trees);
@@ -352,6 +352,7 @@ function setup() {
                             } else {
                                 showMessage("YOU ARE<br>CREWMATE", 2000, "brown")
                                 if (g_game == "amongus") {
+                                    g_next_meeting_time = time() + KILL_TIMEOUT * 1000;
                                     prepareItems(me.tasks);
                                     hide(Q("#time-to-kill"))
                                 }
@@ -722,9 +723,8 @@ function endMeeting() {
     hide(Q("#meeting"));
     if(me.impostor) {
         g_next_kill_time = time() + KILL_TIMEOUT * 1000;
-    } else {
-        g_next_meeting_time = time() + KILL_TIMEOUT * 1000;
-    }
+    } 
+    g_next_meeting_time = time() + KILL_TIMEOUT * 1000;
 
 }
 function moveMySprite(s) {

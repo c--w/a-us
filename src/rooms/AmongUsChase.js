@@ -82,7 +82,7 @@ exports.AmongUsChase = class extends colyseus.Room {
             }
 			this.votes++;
 			if(this.votes == this.alivePlayers) {
-				var max = 0;
+				var max = -1;
 				var max_votes_player_id;
 				var tie = false;
 				this.state.players.forEach((player, key) => {
@@ -90,7 +90,7 @@ exports.AmongUsChase = class extends colyseus.Room {
 						max = player.votes;
 						max_votes_player_id = key;
 						tie = false;
-					} else if(player.votes == max && max!=0) {
+					} else if(player.votes == max) {
 						tie = true;
 					}
 					player.votes = 0;
