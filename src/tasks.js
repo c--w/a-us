@@ -92,6 +92,7 @@ function taskSolved() {
     var thisTaskInfoDiv = Q('#task_'+g_solving_task.index);
     if(thisTaskInfoDiv)
         thisTaskInfoDiv.style.color = "green";
+    showMap();
 }
 
 function solveNotAllDifferent(i, num, range) {

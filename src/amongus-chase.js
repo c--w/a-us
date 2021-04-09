@@ -39,9 +39,10 @@ var TASKS = [
     {x: 1633, y: 275, name: "Wires (CAFFE)", type: "task"},
     {x: 2332, y: 300, name: "Data (CAFFE)", type: "task"},
     {x: 2413, y: 381, name: "Garbage (CAFFE)", type: "task"},
+    {x: 2746, y: 378, name: "Data (WEAPONS)", type: "task"},
     {x: 2800, y: 556, name: "Asteroids (WEAPONS)", type: "task", visual: true},
     {x: 2970, y: 526, name: "Power (WEAPONS)", type: "task"},
-    {x: 2927, y: 890, name: "Power (O2)", type: "task"},
+    {x: 2727, y: 890, name: "Power (O2)", type: "task"},
     {x: 2594, y: 920, name: "Depletion (O2)", type: "task"},
     {x: 2524, y: 931, name: "Filter (O2)", type: "task"},
     {x: 2450, y: 956, name: "Chute (O2)", type: "task"},
@@ -52,7 +53,7 @@ var TASKS = [
     {x: 3558, y: 1062, name: "Steer (NAV)", type: "task"},
     {x: 2914, y: 1501, name: "Power (SHIELDS)", type: "task"},
     {x: 2662, y: 1828, name: "Prime (SHIELDS)", type: "task"},
-    {x: 2557, y: 1194, name: "Data (ADMIN)", type: "task"},
+    {x: 2257, y: 1194, name: "Data (ADMIN)", type: "task"},
     {x: 2572, y: 1207, name: "Depletion (ADMIN)", type: "task"},
     {x: 2504, y: 1384, name: "Card (ADMIN)", type: "task"},
     {x: 2548, y: 1818, name: "Power (COMMS)", type: "task"},
@@ -723,7 +724,7 @@ function endMeeting() {
     hide(Q("#meeting"));
     if(me.impostor) {
         g_next_kill_time = time() + KILL_TIMEOUT * 1000;
-    } 
+    }
     g_next_meeting_time = time() + KILL_TIMEOUT * 1000;
 
 }
@@ -963,25 +964,6 @@ function startGame() {
     var startDiv = Q("#startGame");
     startDiv.style.display = 'none';
 }
-var my_cookies;
-function getCookie(name) {
-    try {
-
-        if (!my_cookies) {
-            my_cookies = {};
-            var c = document.cookie;
-            var a = c.split(";");
-            a.forEach((key_value) => {
-                var tmp = key_value.split("=");
-                my_cookies[tmp[0].trim()] = tmp[1].trim();
-            });
-        }
-        return my_cookies[name];
-    } catch (e) {}
-}
-function setCookie(name, val) {
-    document.cookie = name + "=" + val;
-}
 const lerp = (a, b, t) => (b - a) * t + a;
 
 function colisionTest(object1, object2) {
@@ -1036,33 +1018,6 @@ function showPlayers() {
     }
 
 }
-var g_showMessageTimeout;
-function showMessage(msg, timeout, color) {
-    if(g_showMessageTimeout)
-        clearTimeout(g_showMessageTimeout)
-    var messageDiv = Q("#message");
-    show(messageDiv);
-    messageDiv.innerHTML = msg;
-    messageDiv.style.color = color || "blue";
-    if(timeout) {
-        g_showMessageTimeout =  setTimeout(() => {
-            hide(Q("#message"));
-            g_showMessageTimeout = null;
-        }, timeout);
-    }
-}
-function hide(el) {
-    if(el.target)
-        el = el.target;
-	el.style.display = "none";
-}
-function show(el) {
-	el.style.display = "inline-block";
-}
-
-function time() {
-	return new Date().getTime();
-}
 
 document.getElementById("mapCorridorsImg").onload = function () {
 	loadMap();
@@ -1080,12 +1035,33 @@ function loadMap() {
 }
 setTimeout(loadMap, 5000);
 
-/* Randomize array in-place using Durstenfeld shuffle algorithm */
-function shuffleArray(array) {
-    for (var i = array.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var temp = array[i];
-        array[i] = array[j];
-        array[j] = temp;
+function hideMap() {
+    hide(Q("#map"));
+}
+
+function showMap() {
+    if(g_my_items) {
+        document.querySelectorAll("#map div").forEach(e => e.parentNode.removeChild(e));
+        var mapDiv = Q("#map");
+        show(mapDiv);
+        var img = Q("#map img");
+        var scale = img.naturalWidth/img.width;
+        g_my_items.forEach((item) => {
+            if(item.solved)
+                return;
+            var div = document.createElement("DIV");
+            div.style.position = 'absolute';
+            div.style.padding = 0;
+            div.style.margin = 0;
+            div.style.backgroundColor = "yellow";
+            div.style.height = 8;
+            div.style.width = 8;
+            div.style.left = item.x/scale-4;
+            div.style.top = item.y/scale-4;
+            div.style.zIndex = 1;
+            mapDiv.appendChild(div);
+        })
     }
 }
+
+/* Randomize array in-place using Durstenfeld shuffle algorithm */

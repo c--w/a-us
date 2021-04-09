@@ -31,8 +31,12 @@
 
 	</head>
 	<body>
+		<div id="map" onclick="hideMap();" style="font-size: 18px; z-index:30; position: absolute; top: 0px; left: 0px; right: 0; padding: 0; margin: 0; display:none;">
+			<img src="img/map.png" style="max-width: 100%" />
+		</div>
 		<div id="info" style="z-index:1; text-align: right; position: absolute; top: 5px; right: 5px;" >
 			<input id="startGame" type="submit" value="START" onclick="startGame(event)" style="display:none"/>
+			<input id="mapButton" type="submit" value="MAP" onclick="showMap()" />
 			<div id="players" style="font-size: 18px"></div>
 		</div>
 		<div id="tasks" style="font-size: 18px; z-index:1; position: absolute; top: 5px; left: 5px;display:none;">
@@ -76,6 +80,7 @@
 		</div>
 		<img id="mapCorridorsImg" src="img/map-corridors.png" loading="eager" style="position: fixed; left: -10000; top: -10000; display: none;"/>
 		<canvas id="mapCorridorsCanvas" style="position: fixed; left: -10000; top: -10000; display: none;"/>
+		<script src="utils.js"></script>
 		<script src="amongus-chase.js"></script>
 		<script src="tasks.js"></script>
 	</body>
