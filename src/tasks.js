@@ -55,11 +55,11 @@ function solveTask(task) {
             range = 3;
         solveColors(0, 3, range);
     } else if (a == 3) {
-        var range = 4;
+        var range = 3;
         if(ani)
-            range = 3;
+            range = 2;
         if(mama)
-            range = 5;
+            range = 4;
         solveNumbers(0, 3, range);
     } else if (a == 4) {
         var range = 4;
@@ -171,6 +171,7 @@ function solveSingleTree(i, num, range) {
     html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
     taskDiv.innerHTML = html;
     show(taskDiv);
+    arrangeOverlap(document.querySelectorAll("#task img"), 30, 30)
 }
 
 function solveNumbers(i, num, range) {
@@ -180,7 +181,7 @@ function solveNumbers(i, num, range) {
     }
     var taskDiv = Q("#task");
     var html = '';
-    html+= '<div>'+(Number(i)+1)+' / '+num+' - Broj brojeva</div>'
+    html+= '<div>'+(Number(i)+1)+' / '+num+' - Broj broja</div>'
     range = Number(range);
     i = Number(i);
     var a = Math.floor(Math.random()*range)+1;
@@ -208,6 +209,7 @@ function solveNumbers(i, num, range) {
     html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
     taskDiv.innerHTML = html;
     show(taskDiv);
+    arrangeOverlap(document.querySelectorAll("#task div"), 20, 20)
 
 }
 
@@ -222,7 +224,7 @@ function solveColors(i, num, range) {
     range = Number(range);
     i = Number(i);
     var colors = [
-        {name: "ŽUTA", color: "yellow"},
+        {name: "ŽUTA", color: "gold"},
         {name: "PLAVA", color: "blue"},
         {name: "ZELENA", color: "green"},
         {name: "CRVENA", color: "red"},
@@ -253,6 +255,7 @@ function solveColors(i, num, range) {
     html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
     taskDiv.innerHTML = html;
     show(taskDiv);
+    arrangeOverlap(document.querySelectorAll("#task div"), 300, 30)
 
 }
 
@@ -278,6 +281,7 @@ function solveAnagram(i, num, range) {
     html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
     taskDiv.innerHTML = html;
     show(taskDiv);
+    arrangeOverlap(document.querySelectorAll("#task div"), 20, 20)
 }
 
 function checkAnagram() {
@@ -316,6 +320,7 @@ function solveOrder(i, num, range) {
     html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
     taskDiv.innerHTML = html;
     show(taskDiv);
+    arrangeOverlap(document.querySelectorAll("#task div"), 20, 20)
 }
 
 var g_last_order_number = 0;
@@ -373,6 +378,38 @@ function solveMath(i, num, range) {
     html+='<input type="button" onclick="hideTask()" value="CANCEL" style="position: absolute; bottom: 15px; right: 15px;" >'
     taskDiv.innerHTML = html;
     show(taskDiv);
+}
+
+function arrangeOverlap(elements, minx, miny) {
+    elements.forEach((el1) => {
+        elements.forEach((el2) => {
+            if(el1 == el2)
+                return;
+            var top1 = Number(el1.style.top.slice(0, -2));
+            var top2 = Number(el2.style.top.slice(0, -2));
+            var left1 = Number(el1.style.left.slice(0, -2));
+            var left2 = Number(el2.style.left.slice(0, -2));
+            if(Math.abs(top1-top2) < minx && Math.abs(left1-left2) < miny) {
+                top1 = top1 + Math.sign(top1-top2)*10;
+                top2 = top2 + Math.sign(top2-top1)*10;
+                left1 = left1 + Math.sign(left1-left2)*10;
+                left2 = left2 + Math.sign(left2-left1)*10;
+                if(left1<=0)
+                    left1 = 0;
+                if(left2<=0)
+                    left2 = 0;
+                if(left1>window.innerWidth-(el1.clientWidth || el1.width))
+                    left1=window.innerWidth-(el1.clientWidth || el1.width);
+                if(left2>window.innerWidth-(el2.clientWidth || el2.width))
+                    left2=window.innerWidth-(el2.clientWidth || el2.width);
+                el1.style.top = top1+"px";
+                el2.style.top = top2+"px";
+                el1.style.left = left1+"px";
+                el2.style.left = left2+"px";
+            }
+        });
+    });
+
 }
 function hideTask() {
     hide(Q("#task"))

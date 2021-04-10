@@ -551,11 +551,9 @@ function setup() {
 					updateTime2Kill();
 			    checkActions();
 			    if (me.alive) {
-			        futureMePos.x += me.s.x * 2;
-			        if (me.alive && !isCorridor(futureMePos.x, futureMePos.y))
+			        if (!isCorridor(futureMePos.x + me.s.x * 2, futureMePos.y))
 			            me.s.x *= 0;
-			        futureMePos.y += me.s.y * 2;
-			        if (!isCorridor(futureMePos.x, futureMePos.y))
+			        if (!isCorridor(futureMePos.x, futureMePos.y + me.s.y * 2))
 			            me.s.y *= 0;
 			    }
 			}
@@ -734,7 +732,7 @@ function moveMySprite(s) {
     } else if(me.s.x<0) {
         me.sprite.scale.x = Math.abs(me.sprite.scale.x);
     }
-    me.sprite.skew.x = -me.s.x/30;
+    me.sprite.skew.x = -me.s.x/50;
     var flagJump = false;
     var newx = me.lx - offset.x + tilingSprite.x;
     var newy = me.ly - offset.y + tilingSprite.y;
