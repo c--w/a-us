@@ -496,15 +496,13 @@ function setup() {
                     player.sprite.texture = app.loader.resources["img/" + (player.color || "blue") + "-among-us.png"].texture;
                     showPlayers();
                 } else if (changes[i].field == 'impostor') {
-                    if (player.id != mySessionId) {
+                    if (player.impostor) {
+                        if (player.id == mySessionId) {
+                            player.tag.style = styleImpostor;
                         g_impostor = player;
-                        continue;
-                    }
-                    player.impostor = changes[i].value;
-                    if (player.impostor)
-                        player.tag.style = styleImpostor;
-                    else
+                    } else {
                         player.tag.style = style;
+                    }
                 } else if (changes[i].field == 'alive') {
                     if (!player.alive) {
                         if(player == me)
